@@ -17,7 +17,15 @@ echo ""
 echo "Step 1: Destroying Terraform resources..."
 cd terraform
 if [ -f terraform.tfstate ]; then
-    terraform destroy -auto-approve
+    terraform destroy -auto-approve || {
+        echo "⚠️  Terraform destroy encountered errors (possibly resources already deleted manually)"
+        read -p "Remove Terraform state files to reset? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            rm -f terraform.tfstate terraform.tfstate.backup
+            echo "✅ Terraform state cleaned up"
+        fi
+    }
 else
     echo "No Terraform state found, skipping..."
 fi
@@ -38,7 +46,15 @@ echo "Step 4: Deleting namespace (this will clean up secrets and PVCs)..."
 kubectl delete namespace chat-demo --ignore-not-found=true
 
 echo ""
-echo "Step 5: Cleaning up Docker images..."
+echo "Step 5: Cleaning up Datadog CRDs..."
+kubectl delete crd datadogagents.datadoghq.com --ignore-not-found=true
+kubectl delete crd datadogmetrics.datadoghq.com --ignore-not-found=true
+kubectl delete crd datadogmonitors.datadoghq.com --ignore-not-found=true
+kubectl delete crd datadogpodautoscalers.datadoghq.com --ignore-not-found=true
+echo "✅ Datadog CRDs cleaned up"
+
+echo ""
+echo "Step 6: Cleaning up Docker images..."
 read -p "Delete local Docker images? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -49,4 +65,6 @@ echo ""
 echo "================================================"
 echo "✅ Teardown complete!"
 echo "================================================"
+echo ""
+echo "💡 Tip: To start fresh, run './scripts/setup.sh'"
 

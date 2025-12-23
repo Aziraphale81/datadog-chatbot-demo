@@ -52,11 +52,33 @@ docker build -t chat-frontend:latest \
   ./frontend
 
 echo ""
-echo "Step 2: Creating namespace..."
+echo "Step 2: Cleaning up any previous Datadog installations..."
+# Remove old Datadog Operator if it exists
+if helm list -n datadog-operator 2>/dev/null | grep -q "datadog-operator"; then
+    echo "Found old Datadog Operator installation, removing..."
+    helm uninstall datadog-operator -n datadog-operator 2>/dev/null || true
+    kubectl delete namespace datadog-operator --ignore-not-found=true
+fi
+
+# Remove Datadog Agent if installed in chat-demo namespace
+if helm list -n chat-demo 2>/dev/null | grep -q "datadog-agent"; then
+    echo "Found existing Datadog Agent in chat-demo, removing..."
+    helm uninstall datadog-agent -n chat-demo 2>/dev/null || true
+fi
+
+# Clean up Datadog CRDs if they exist (from old Operator install)
+echo "Cleaning up Datadog CRDs..."
+kubectl delete crd datadogagents.datadoghq.com --ignore-not-found=true
+kubectl delete crd datadogmetrics.datadoghq.com --ignore-not-found=true
+kubectl delete crd datadogmonitors.datadoghq.com --ignore-not-found=true
+kubectl delete crd datadogpodautoscalers.datadoghq.com --ignore-not-found=true
+
+echo ""
+echo "Step 3: Creating namespace..."
 kubectl apply -f k8s/namespace.yaml
 
 echo ""
-echo "Step 3: Configuring secrets..."
+echo "Step 4: Configuring secrets..."
 if ! kubectl get secret datadog-keys -n chat-demo >/dev/null 2>&1; then
     echo "📝 Let's set up your Datadog credentials"
     echo ""
@@ -105,13 +127,13 @@ else
 fi
 
 echo ""
-echo "Step 4: Deploying Kubernetes resources..."
+echo "Step 5: Deploying Kubernetes resources..."
 kubectl apply -f k8s/postgres.yaml
 kubectl apply -f k8s/backend.yaml
 kubectl apply -f k8s/frontend.yaml
 
 echo ""
-echo "Step 5: Deploying Datadog resources via Terraform..."
+echo "Step 6: Deploying Datadog resources via Terraform..."
 cd terraform
 
 if [ ! -f terraform.tfvars ]; then
