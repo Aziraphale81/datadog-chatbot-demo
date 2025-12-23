@@ -1,0 +1,19 @@
+# Copy this file to terraform.tfvars and fill in your values
+# NEVER commit terraform.tfvars to git!
+
+datadog_api_key = "YOUR_DATADOG_API_KEY_HERE"
+datadog_app_key = "YOUR_DATADOG_APP_KEY_HERE"
+datadog_api_url = "https://api.datadoghq.com"
+datadog_site    = "datadoghq.com"               
+
+environment   = "demo"
+cluster_name  = "docker-desktop"
+namespace     = "chat-demo"
+
+backend_service  = "chat-backend"
+frontend_service = "chat-frontend"
+
+# Optional: Alert destinations
+alert_email         = "your-email@example.com"
+alert_slack_channel = "@slack-alerts"
+

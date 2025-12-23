@@ -1,0 +1,33 @@
+FROM node:20-alpine AS build
+WORKDIR /app
+
+# Build args for Next.js NEXT_PUBLIC_* variables
+ARG NEXT_PUBLIC_DD_CLIENT_TOKEN
+ARG NEXT_PUBLIC_DD_APP_ID
+ARG NEXT_PUBLIC_DD_SITE=datadoghq.com
+ARG NEXT_PUBLIC_DD_SERVICE=chat-frontend
+ARG NEXT_PUBLIC_DD_ENV=demo
+ARG BACKEND_INTERNAL_BASE=http://backend.chat-demo.svc.cluster.local:8000
+
+# Set as env vars for the build
+ENV NEXT_PUBLIC_DD_CLIENT_TOKEN=$NEXT_PUBLIC_DD_CLIENT_TOKEN
+ENV NEXT_PUBLIC_DD_APP_ID=$NEXT_PUBLIC_DD_APP_ID
+ENV NEXT_PUBLIC_DD_SITE=$NEXT_PUBLIC_DD_SITE
+ENV NEXT_PUBLIC_DD_SERVICE=$NEXT_PUBLIC_DD_SERVICE
+ENV NEXT_PUBLIC_DD_ENV=$NEXT_PUBLIC_DD_ENV
+ENV BACKEND_INTERNAL_BASE=$BACKEND_INTERNAL_BASE
+
+COPY package.json package-lock.json* /app/
+RUN npm install
+COPY . /app
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=build /app ./
+ENV NODE_ENV=production
+ENV PORT=3000
+EXPOSE 3000
+CMD ["npm", "start"]
+
+

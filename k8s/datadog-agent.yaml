@@ -1,0 +1,24 @@
+apiVersion: datadoghq.com/v2alpha1
+kind: DatadogAgent
+metadata:
+  name: datadog
+  namespace: chat-demo
+spec:
+  global:
+    site: datadoghq.com
+    clusterName: docker-desktop
+    credentials:
+      apiSecret:
+        secretName: datadog-keys
+        keyName: api-key
+      appSecret:
+        secretName: datadog-keys
+        keyName: app-key
+  features:
+    apm:
+      enabled: true
+    logCollection:
+      enabled: true
+    orchestratorExplorer:
+      enabled: true
+
