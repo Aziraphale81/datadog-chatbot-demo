@@ -214,41 +214,43 @@ resource "datadog_monitor" "pod_restarts" {
 }
 
 # SLO Burn Rate - Backend Availability
-resource "datadog_monitor" "backend_slo_burn_rate" {
-  name    = "[${var.environment}] Backend SLO Burn Rate Alert"
-  type    = "slo alert"
-  message = <<-EOT
-    Backend availability SLO is burning error budget too quickly!
-    
-    At this rate, you'll exhaust your error budget before the end of the period.
-    
-    Check:
-    - Recent deployments or changes
-    - Error rate and latency trends
-    - APM Error Tracking for root causes
-    
-    ${var.alert_email != "" ? "@${var.alert_email}" : ""}
-    ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
-  EOT
-
-  query = "burn_rate(\"backend_availability\").over(\"1h\").long_window(\"1d\").short_window(\"5m\") > 14.4"
-
-  monitor_thresholds {
-    critical          = 14.4  # Burns through monthly budget in 2 days
-    critical_recovery = 12
-  }
-
-  notify_no_data    = false
-  renotify_interval = 120
-  notify_audit      = false
-  include_tags      = true
-  priority          = 1
-
-  tags = [
-    "service:${var.backend_service}",
-    "env:${var.environment}",
-    "category:slo",
-    "managed_by:terraform"
-  ]
-}
+# NOTE: Commented out to create manually in UI and export later
+# Datadog SLO burn rate query syntax may require specific configuration
+# resource "datadog_monitor" "backend_slo_burn_rate" {
+#   name    = "[${var.environment}] Backend SLO Burn Rate Alert"
+#   type    = "slo alert"
+#   message = <<-EOT
+#     Backend availability SLO is burning error budget too quickly!
+#     
+#     At this rate, you'll exhaust your error budget before the end of the period.
+#     
+#     Check:
+#     - Recent deployments or changes
+#     - Error rate and latency trends
+#     - APM Error Tracking for root causes
+#     
+#     ${var.alert_email != "" ? "@${var.alert_email}" : ""}
+#     ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
+#   EOT
+# 
+#   query = "burn_rate(\"${datadog_service_level_objective.backend_availability.id}\").long_window(\"1h\").short_window(\"5m\") > 14.4"
+# 
+#   monitor_thresholds {
+#     critical          = 14.4  # Burns through monthly budget in 2 days
+#     critical_recovery = 12
+#   }
+# 
+#   notify_no_data    = false
+#   renotify_interval = 120
+#   notify_audit      = false
+#   include_tags      = true
+#   priority          = 1
+# 
+#   tags = [
+#     "service:${var.backend_service}",
+#     "env:${var.environment}",
+#     "category:slo",
+#     "managed_by:terraform"
+#   ]
+# }
 
