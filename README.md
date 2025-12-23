@@ -4,6 +4,8 @@ Minimal FastAPI + Postgres backend and Next.js frontend, fully instrumented with
 
 All Datadog resources (monitors, SLOs, dashboards, synthetics) are managed via Terraform for easy version control and team sharing.
 
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/1dd5cc07-409f-4f06-a88b-43010b8a8123" />
+
 ## Quick Start (Automated)
 
 ```bash
