@@ -62,6 +62,10 @@ spec:
               value: "true"
             - name: DD_PROFILING_ENABLED
               value: "true"
+            - name: DD_APPSEC_ENABLED
+              value: "true"
+            - name: DD_APPSEC_SCA_ENABLED
+              value: "true"
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:

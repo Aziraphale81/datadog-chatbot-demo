@@ -125,7 +125,13 @@ open http://localhost:30080
 # - LLM Obs: llm.datadoghq.com → search chat-backend
 # - DBM: dbm.datadoghq.com → search postgres
 
-# 5. Check Terraform outputs
+# 5. Verify security features
+# - ASM: security/appsec → Send attack payload (see SECURITY_SETUP.md)
+# - SIEM: security/signals → Check detection rules active
+# - CSM: security/csm → Container images and K8s posture
+# - Code Security: Requires GitHub integration (see SECURITY_SETUP.md)
+
+# 6. Check Terraform outputs
 cd terraform
 terraform output dashboard_url
 # Open URL → Should show dashboard with data
@@ -137,16 +143,20 @@ terraform output dashboard_url
 
 ### For Customer Demonstrations
 1. **End-to-End Observability**: RUM → APM → Logs → DBM all correlated
-2. **Modern Stack**: K8s, AI/LLM, microservices
-3. **Real Scenarios**: Latency tracking, error monitoring, cost optimization
-4. **IaC Best Practices**: Terraform-managed monitors, SLOs, dashboards
-5. **Service Management**: Ready for Incidents, Cases, Event Correlation demos
+2. **Full Security Platform**: ASM, Code Security, Cloud SIEM, CSM
+3. **Modern Stack**: K8s, AI/LLM, microservices
+4. **Real Scenarios**: Latency tracking, error monitoring, cost optimization, threat detection
+5. **IaC Best Practices**: Terraform-managed monitors, SLOs, dashboards, security rules
+6. **Service Management**: Ready for Incidents, Cases, Event Correlation demos
 
 ### Key Demo Flows
 - **Trace a user action**: Click in RUM → APM trace → OpenAI span → DB query
 - **Troubleshoot an error**: Monitor alert → Logs correlation → Root cause
 - **Track LLM costs**: Dashboard → Token usage → Cost attribution
 - **SLO burn rate**: Show degrading latency → SLO burn → Alert
+- **Security threat detection**: Send attack payload → ASM detection → SIEM signal
+- **Vulnerability management**: Code Security scan → CVE details → Remediation
+- **Runtime security**: CSM Threats → Container activity monitoring
 
 ---
 

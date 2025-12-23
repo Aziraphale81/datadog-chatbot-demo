@@ -1,8 +1,8 @@
 # Local Chatbot + Datadog on Docker Desktop Kubernetes
 
-Minimal FastAPI + Postgres backend and Next.js frontend, fully instrumented with Datadog (APM, Logs, Metrics, RUM, DBM, LLM Observability, Profiler, Processes, Orchestrator Explorer). Runs on the Docker Desktop Kubernetes cluster in a single namespace (`chat-demo`), exposed via NodePort.
+Minimal FastAPI + Postgres backend and Next.js frontend, fully instrumented with Datadog (APM, Logs, Metrics, RUM, DBM, LLM Observability, Profiler, Processes, Orchestrator Explorer, **Application Security, Cloud SIEM, Cloud Security Management**). Runs on the Docker Desktop Kubernetes cluster in a single namespace (`chat-demo`), exposed via NodePort.
 
-All Datadog resources (monitors, SLOs, dashboards, synthetics) are managed via Terraform for easy version control and team sharing.
+All Datadog resources (monitors, SLOs, dashboards, synthetics, security rules) are managed via Terraform for easy version control and team sharing.
 
 <img width="800" alt="image" src="https://github.com/user-attachments/assets/1dd5cc07-409f-4f06-a88b-43010b8a8123" />
 
@@ -91,9 +91,10 @@ terraform apply
 ```
 
 This will:
-- Deploy Datadog Agent via Helm
+- Deploy Datadog Agent via Helm (with ASM, CSM, and all security features)
 - Create 6 monitors (latency, errors, OpenAI, RUM, DB, K8s)
 - Create 3 SLOs (backend availability/latency, frontend error rate)
+- Create 5 Cloud SIEM detection rules
 - Create a comprehensive dashboard
 - Create 2 synthetic tests (frontend uptime, backend health)
 
@@ -128,12 +129,21 @@ terraform -chdir=terraform output -raw dashboard_url
 - ✅ **Orchestrator Explorer**: K8s resource visibility
 - ✅ **Metrics**: Infrastructure and custom business metrics
 
+### Datadog Security (Full Platform)
+- ✅ **Application Security (ASM)**: Runtime threat detection, attack blocking, vulnerability management
+- ✅ **Code Security**: SAST scanning for vulnerabilities in code and dependencies
+- ✅ **Cloud SIEM**: Log-based security threat detection with 5 custom rules
+- ✅ **CSM Threats**: Runtime container security monitoring
+- ✅ **CSM Misconfigurations**: Kubernetes security posture management
+- ✅ **Container Vulnerabilities**: Docker image CVE scanning
+
 ### Terraform-Managed Resources
 - **6 Monitors**: Backend latency/errors, OpenAI failures, RUM errors, DB slow queries, K8s restarts
 - **3 SLOs**: Backend availability (99.5%), backend latency (p95 < 2s), frontend error-free sessions (99%)
 - **1 Dashboard**: Comprehensive overview with APM, LLM, DBM, RUM, K8s sections
 - **2 Synthetic Tests**: Frontend uptime check, backend health check
-- **Datadog Agent**: Deployed via Helm with full config
+- **5 SIEM Rules**: High error rate, SQL injection, OpenAI abuse, container escape, DB auth failures
+- **Datadog Agent**: Deployed via Helm with full observability + security config
 
 ---
 
@@ -263,6 +273,58 @@ This sandbox demonstrates:
 - **LLM monitoring**: OpenAI usage, costs, latency, errors
 - **Kubernetes observability**: Orchestrator Explorer, resource utilization
 - **Synthetic monitoring**: Proactive uptime checks
+- **Application security**: Runtime threat detection, attack blocking (ASM)
+- **Code security**: Vulnerable dependency scanning, SAST analysis
+- **Cloud SIEM**: Log-based threat detection, security analytics
+- **Cloud security**: Container vulnerabilities, runtime threats, compliance
+
+---
+
+## 🔒 Security Features
+
+This demo includes **full Datadog Security Platform**:
+
+### Quick Start
+See [SECURITY_SETUP.md](SECURITY_SETUP.md) for detailed setup and demo instructions.
+
+### What's Included
+
+**Application Security Management (ASM)**
+- ✅ Enabled automatically
+- Detects SQL injection, XSS, RCE, SSRF attacks
+- Test with: `curl -X POST http://localhost:30080/api/chat -d '{"prompt":"Hello'\'' OR 1=1--"}'`
+
+**Code Security (SAST)**
+- ⚠️ Requires GitHub integration (one-time setup)
+- Scans Python/JavaScript code for vulnerabilities
+- Detects vulnerable dependencies in requirements.txt and package.json
+
+**Cloud SIEM**
+- ✅ Enabled automatically with 5 detection rules
+- Monitors for: High error rates, SQL injection, OpenAI abuse, container escapes, DB auth failures
+- View signals: [Security Signals Explorer](https://app.datadoghq.com/security)
+
+**Cloud Security Management (CSM)**
+- ✅ Enabled automatically
+- **CSM Threats**: Runtime container security
+- **CSM Misconfigurations**: K8s security posture (CIS benchmarks)
+- **Container Vulnerabilities**: Docker image CVE scanning
+
+### Demo Flow
+```bash
+# 1. Send attack payload (ASM will detect)
+curl -X POST http://localhost:30080/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Hello'\'' OR 1=1--"}'
+
+# 2. Trigger SIEM alert (high error rate)
+for i in {1..60}; do curl http://localhost:30080/nonexistent; done
+
+# 3. View results
+open https://app.datadoghq.com/security
+```
+
+See [SECURITY_SETUP.md](SECURITY_SETUP.md) for complete testing guide.
 
 ---
 

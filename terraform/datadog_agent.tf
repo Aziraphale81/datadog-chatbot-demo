@@ -23,6 +23,11 @@ resource "helm_release" "datadog_agent" {
           enabled = true
         }
         
+        # Application Security Management (ASM)
+        appSec = {
+          enabled = true
+        }
+        
         logs = {
           enabled            = true
           containerCollectAll = true
@@ -42,6 +47,21 @@ resource "helm_release" "datadog_agent" {
         }
         
         databaseMonitoring = {
+          enabled = true
+        }
+        
+        # Cloud Security Management (CSM)
+        securityAgent = {
+          compliance = {
+            enabled = true
+          }
+          runtime = {
+            enabled = true
+          }
+        }
+        
+        # Container Image Vulnerabilities
+        containerImageCollection = {
           enabled = true
         }
         
