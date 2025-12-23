@@ -43,6 +43,8 @@ spec:
               value: chat-frontend
             - name: NEXT_PUBLIC_DD_ENV
               value: demo
+            - name: NEXT_PUBLIC_DD_VERSION
+              value: "1.0.0"
           ports:
             - containerPort: 3000
           resources:

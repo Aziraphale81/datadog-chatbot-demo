@@ -35,6 +35,8 @@ spec:
               value: chat-backend
             - name: DD_ENV
               value: demo
+            - name: DD_VERSION
+              value: "1.0.0"
             - name: DD_SITE
               value: datadoghq.com
             - name: DD_SOURCE

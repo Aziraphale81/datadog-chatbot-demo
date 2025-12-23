@@ -20,7 +20,7 @@ resource "datadog_synthetics_test" "frontend_uptime" {
 
   request_definition {
     method = "GET"
-    url    = "http://localhost:30080"
+    url    = "http://localhost:30080"  # Note: Update to public URL for production (localhost won't work from Datadog's synthetic locations)
   }
 
   assertion {
@@ -46,7 +46,7 @@ resource "datadog_synthetics_test" "frontend_uptime" {
     }
   }
 
-  locations = ["aws:us-east-1"]  # Change to your preferred locations
+  locations = ["aws:us-east-1"]  # Single location for cost optimization. Production: add ["aws:us-west-2", "aws:eu-west-1"]
 
   tags = [
     "service:${var.frontend_service}",
@@ -102,7 +102,7 @@ resource "datadog_synthetics_test" "backend_health" {
     }
   }
 
-  locations = ["aws:us-east-1"]
+  locations = ["aws:us-east-1"]  # Single location for cost optimization
 
   tags = [
     "service:${var.backend_service}",

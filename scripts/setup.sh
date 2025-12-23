@@ -48,6 +48,7 @@ docker build -t chat-frontend:latest \
   --build-arg NEXT_PUBLIC_DD_SITE=datadoghq.com \
   --build-arg NEXT_PUBLIC_DD_SERVICE=chat-frontend \
   --build-arg NEXT_PUBLIC_DD_ENV=demo \
+  --build-arg NEXT_PUBLIC_DD_VERSION=1.0.0 \
   --build-arg BACKEND_INTERNAL_BASE=http://backend.chat-demo.svc.cluster.local:8000 \
   ./frontend
 

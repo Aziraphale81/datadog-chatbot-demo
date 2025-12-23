@@ -8,6 +8,7 @@ const ddAppId = process.env.NEXT_PUBLIC_DD_APP_ID;
 const ddSite = process.env.NEXT_PUBLIC_DD_SITE || "datadoghq.com";
 const ddService = process.env.NEXT_PUBLIC_DD_SERVICE || "chat-frontend";
 const ddEnv = process.env.NEXT_PUBLIC_DD_ENV || "dev";
+const ddVersion = process.env.NEXT_PUBLIC_DD_VERSION || "1.0.0";
 
 function MyApp({ Component, pageProps }) {
   useEffect(() => {
@@ -22,7 +23,7 @@ function MyApp({ Component, pageProps }) {
       site: ddSite,
       service: ddService,
       env: ddEnv,
-      version: "0.1.0",
+      version: ddVersion,
       sessionSampleRate: 100,
       sessionReplaySampleRate: 100,
       trackBfcacheViews: true,

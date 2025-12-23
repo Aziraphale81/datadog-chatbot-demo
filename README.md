@@ -60,6 +60,7 @@ docker build -t chat-frontend:latest \
   --build-arg NEXT_PUBLIC_DD_SITE=datadoghq.com \
   --build-arg NEXT_PUBLIC_DD_SERVICE=chat-frontend \
   --build-arg NEXT_PUBLIC_DD_ENV=demo \
+  --build-arg NEXT_PUBLIC_DD_VERSION=1.0.0 \
   --build-arg BACKEND_INTERNAL_BASE=http://backend.chat-demo.svc.cluster.local:8000 \
   ./frontend
 ```
@@ -171,6 +172,83 @@ helm uninstall datadog-agent -n chat-demo
 - Monitors/SLOs/Dashboards: Edit `terraform/*.tf` files and re-apply
 - Alert destinations: Set `alert_email` and `alert_slack_channel` in `terraform/terraform.tfvars`
 - App config: Modify `k8s/*.yaml` manifests and `kubectl apply`
+
+---
+
+## Production Readiness
+
+This sandbox is optimized for **demos and learning**. For production deployments, consider these adjustments:
+
+### **Observability Configuration**
+
+| Component | Demo Setting | Production Recommendation |
+|-----------|--------------|---------------------------|
+| **RUM Sampling** | 100% | 20-30% (cost optimization) |
+| **Session Replay** | 100% | 10-20% (cost optimization) |
+| **Log Indexing** | All logs indexed | Exclude debug logs, use sampling for high-volume services |
+| **APM Sampling** | Default (100%) | Adjust ingestion rate based on traffic volume |
+| **Synthetics** | Single location | 2-3 locations for geographic coverage |
+| **Synthetic Frequency** | 5 minutes | 1-5 minutes based on criticality |
+
+### **Monitor Configuration**
+
+- **Adjust thresholds** based on your SLAs and traffic patterns
+- **Add composite monitors** for complex failure scenarios (e.g., high latency AND high error rate)
+- **Configure downtime schedules** for planned maintenance
+- **Set up escalation policies** with PagerDuty/OpsGenie integration
+- **Review alert fatigue** - add `min_failure_duration` to prevent flapping
+
+### **Tagging Strategy**
+
+Add these production tags:
+```yaml
+- cost_center: "engineering"      # For cost allocation
+- owner: "team-name"               # Clear ownership
+- criticality: "tier1"             # SLA classification
+- DD_VERSION: "git-sha"            # Track deployments
+```
+
+### **Security Hardening**
+
+- **Secrets Management**: Use AWS Secrets Manager, HashiCorp Vault, or sealed-secrets instead of plain K8s Secrets
+- **Network Policies**: Restrict pod-to-pod communication
+- **RBAC**: Limit Datadog Agent permissions to only required namespaces
+- **Log Scrubbing**: Configure sensitive data scrubbing rules (credit cards, PII, API keys)
+- **TLS**: Enable TLS for external endpoints
+
+### **Scalability Considerations**
+
+- **Resource Limits**: Adjust CPU/memory requests and limits based on load testing
+- **HPA (Horizontal Pod Autoscaler)**: Add autoscaling for backend/frontend pods
+- **Database**: Use managed Postgres (RDS, Cloud SQL) with automated backups
+- **Datadog Agent**: Consider cluster agent for improved performance at scale
+- **Connection Pooling**: Tune Postgres connection pool sizes
+
+### **Cost Optimization**
+
+- **Log Exclusion Filters**: Aggressively filter noisy logs (health checks, debug logs)
+- **Log Sampling**: Sample high-volume logs (1 in 10 or 1 in 100)
+- **Index Configuration**: Use multiple indexes with different retention periods
+- **Metric Cardinality**: Monitor and limit high-cardinality tags
+- **Synthetic Test Budget**: Limit test frequency for non-critical endpoints
+
+### **Synthetic Tests**
+
+⚠️ **Current Setup Issue**: Synthetic tests use `localhost` URLs which won't work from Datadog's locations.
+
+**For Production:**
+1. Deploy app with public endpoint or VPN
+2. Update `terraform/synthetics.tf` with real URLs
+3. Add multi-step API tests for critical user journeys
+4. Consider browser tests for complex UI interactions
+
+### **Deployment Tracking**
+
+Correlate deployments with performance changes:
+1. Set `DD_VERSION` to git SHA or semantic version
+2. Use Deployment Tracking API to mark releases
+3. Create deployment markers on dashboards
+4. Set up deployment-triggered monitors
 
 ---
 
