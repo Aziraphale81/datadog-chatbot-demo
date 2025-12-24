@@ -4,6 +4,75 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - 2024-12-24
 
+### Changed - OpenAI Model Upgrade
+- **GPT-5-nano**: Upgraded from `gpt-4o-mini` to `gpt-5-nano`
+  - **67% cheaper input** tokens ($0.15 → $0.05 per 1M tokens)
+  - **33% cheaper output** tokens ($0.60 → $0.40 per 1M tokens)
+  - **3x larger context** window (128K → 400K tokens)
+  - **Faster** response times
+  - Updated API parameter from `max_tokens` to `max_completion_tokens` for GPT-5 compatibility
+
+### Changed - Monitor Threshold Adjustments
+- **Backend Error Rate Monitor**: Fixed incorrect query and adjusted thresholds
+  - Changed from `.as_rate()` (errors/sec) to `.as_count()` (total errors in window)
+  - Critical: 20 errors in 5 minutes (was 0.05 errors/sec - meaningless)
+  - Warning: 10 errors in 5 minutes (was 0.02 errors/sec - meaningless)
+- **Backend Latency Monitor**: Relaxed thresholds to account for OpenAI API latency
+  - Critical: 5 seconds (was 2s - too tight for LLM calls)
+  - Warning: 3 seconds (was 1.5s)
+  - Added note about OpenAI API response times in alert message
+
+### Added - ChatGPT-Style UI
+- **Complete UI Overhaul**: Redesigned frontend with modern ChatGPT-style interface
+  - **Sidebar** with session history and "New chat" button
+  - **Session Management**: Multi-session support with persistent history
+  - **Markdown Rendering**: Full markdown support with syntax highlighting
+  - **Auto-scrolling**: Automatically scrolls to latest messages
+  - **Responsive Design**: Mobile-friendly with hamburger menu
+- **Backend Session API**: New endpoints for session management
+  - `POST /sessions` - Create new session
+  - `GET /sessions` - List all sessions
+  - `GET /sessions/{id}` - Get specific session
+  - `DELETE /sessions/{id}` - Delete session
+  - `GET /sessions/{id}/messages` - Get session messages
+  - `POST /sessions/{id}/generate-title` - AI-generated session titles
+  - `PUT /sessions/{id}/title` - Update session title
+- **Database Schema Updates**: Added `sessions` table with migration logic
+  - Automatic migration on startup for existing deployments
+  - Session ID foreign key on `chat_messages` table
+
+### Changed - Browser Synthetic Test
+- **Revamped for New UI**: Completely rebuilt browser test for ChatGPT-style interface
+  - Updated all CSS selectors for new component structure
+  - Added multi-turn conversation testing (2 messages + responses)
+  - Includes sidebar session verification (optional step)
+  - Increased timeout for send actions to handle OpenAI latency (20s)
+  - All steps now use correct element selectors (textarea, .user-message, .assistant-message)
+
+### Added - Inferred Services
+- **Service Override Removal**: Enabled `DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED=true`
+  - Uses modern inferred services approach
+  - Cleaner service maps and lists
+  - Database and external services automatically inferred from span attributes
+  - Follows Datadog best practices per [service overrides documentation](https://docs.datadoghq.com/tracing/guide/service_overrides/)
+
+### Added - Browser Synthetic Test
+- **User Journey Test**: Added Browser test to simulate real user interactions
+  - Navigates to chat page
+  - Types a message and clicks send
+  - Waits for AI response
+  - Validates successful interaction
+  - Runs every 15 minutes on private location
+  - **Dual Purpose**: Synthetic monitoring + RUM traffic generator
+  - Creates continuous observability data across entire stack (RUM → APM → LLM → DBM → NPM)
+
+### Added - Network Performance Monitoring
+- **NPM Documentation**: Added Cloud Network Monitoring to README
+  - Shows service-to-service network flows and latencies
+  - Tracks TCP metrics (retransmits, failures, connections/s)
+  - Visualizes all Datadog intake endpoints
+  - Demonstrates complete observability stack
+
 ### Added - Software Catalog Integration
 - **Software Catalog Entities**: Created 4 service definitions managed by Terraform
   - `chat-backend`: Backend API service with APM, LLM Observability, ASM, IAST

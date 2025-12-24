@@ -4,14 +4,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { prompt } = req.body || {};
+  const { prompt, session_id } = req.body || {};
   if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
     return res.status(400).json({ error: "Prompt is required" });
   }
 
-  const backendBase =
-    process.env.BACKEND_INTERNAL_BASE ||
-    "http://backend.chat-demo.svc.cluster.local:8000";
+  const backendBase = process.env.BACKEND_URL || "http://backend:8000";
 
   // Forward Datadog trace headers for distributed tracing
   const traceHeaders = {};
@@ -34,7 +32,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
         ...traceHeaders,
       },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, session_id }),
     });
 
     if (!resp.ok) {

@@ -68,13 +68,15 @@ spec:
               value: "true"
             - name: DD_IAST_ENABLED
               value: "true"
+            - name: DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED
+              value: "true"
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: openai-key
                   key: openai-api-key
             - name: OPENAI_MODEL
-              value: gpt-4o-mini
+              value: gpt-5-nano
             - name: POSTGRES_DSN
               value: postgresql://postgres:postgres@postgres:5432/postgres
             - name: DD_DB_USER

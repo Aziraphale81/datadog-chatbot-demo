@@ -27,8 +27,9 @@ output "dashboard_url" {
 output "synthetic_test_ids" {
   description = "IDs of synthetic tests"
   value = {
-    frontend_uptime  = datadog_synthetics_test.frontend_uptime.id
-    backend_health   = datadog_synthetics_test.backend_health.id
+    frontend_uptime   = datadog_synthetics_test.frontend_uptime.id
+    backend_health    = datadog_synthetics_test.backend_health.id
+    chat_user_journey = datadog_synthetics_test.chat_user_journey.id
   }
 }
 

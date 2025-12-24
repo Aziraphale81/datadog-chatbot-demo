@@ -5,22 +5,25 @@ resource "datadog_monitor" "backend_latency_p95" {
   name    = "[${var.environment}] Backend API Latency (p95) is high"
   type    = "metric alert"
   message = <<-EOT
-    The p95 latency for ${var.backend_service} has exceeded the threshold.
+    The p95 latency for ${var.backend_service} has exceeded 5 seconds.
+    
+    Note: This includes OpenAI API calls which can be slow.
     
     Check:
     - APM traces for slow endpoints
     - Database query performance
     - OpenAI API response times
+    - LLM Observability for model performance
     
     ${var.alert_email != "" ? "@${var.alert_email}" : ""}
     ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
   EOT
 
-  query = "avg(last_5m):p95:trace.http.request{service:${var.backend_service},env:${var.environment}} > 2"
+  query = "avg(last_5m):p95:trace.http.request{service:${var.backend_service},env:${var.environment}} > 5"
 
   monitor_thresholds {
-    critical = 2.0
-    warning  = 1.5
+    critical = 5.0  # 5 seconds (reasonable for OpenAI API calls)
+    warning  = 3.0  # 3 seconds
   }
 
   notify_no_data    = false
@@ -38,12 +41,12 @@ resource "datadog_monitor" "backend_latency_p95" {
   ]
 }
 
-# Backend error rate
+# Backend error rate (absolute count)
 resource "datadog_monitor" "backend_error_rate" {
   name    = "[${var.environment}] Backend API Error Rate is high"
   type    = "metric alert"
   message = <<-EOT
-    The error rate for ${var.backend_service} has exceeded 5%.
+    The ${var.backend_service} has exceeded 20 errors in the last 5 minutes.
     
     Check APM Error Tracking for details.
     
@@ -51,11 +54,11 @@ resource "datadog_monitor" "backend_error_rate" {
     ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
   EOT
 
-  query = "sum(last_5m):trace.http.request.errors{service:${var.backend_service},env:${var.environment}}.as_rate() > 0.05"
+  query = "sum(last_5m):trace.http.request.errors{service:${var.backend_service},env:${var.environment}}.as_count() > 20"
 
   monitor_thresholds {
-    critical = 0.05
-    warning  = 0.02
+    critical = 20  # 20 errors in 5 minutes
+    warning  = 10  # 10 errors in 5 minutes
   }
 
   notify_no_data    = false

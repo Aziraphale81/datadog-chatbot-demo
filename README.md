@@ -96,7 +96,7 @@ This will:
 - Create 3 SLOs (backend availability/latency, frontend error rate)
 - Create 5 Cloud SIEM detection rules
 - Create a comprehensive dashboard
-- Create 2 synthetic tests (frontend uptime, backend health)
+- Create 3 synthetic tests (frontend uptime, backend health, browser user journey)
 - Create 4 Software Catalog entities (backend, frontend, postgres, openai)
 
 ### 5) Access the application
@@ -120,12 +120,13 @@ terraform -chdir=terraform output -raw dashboard_url
 - **Kubernetes**: Single namespace deployment on Docker Desktop
 
 ### Datadog Observability (Full Stack)
-- ✅ **APM**: Distributed traces for FastAPI → OpenAI → Postgres
+- ✅ **APM**: Distributed traces for FastAPI → OpenAI → Postgres with inferred services
 - ✅ **Logs**: JSON structured logs with trace correlation
 - ✅ **DBM**: Postgres query samples and execution plans
 - ✅ **Software Catalog**: Service definitions with ownership (team:chatbot)
 - ✅ **RUM**: Browser telemetry, Session Replay, dummy user tracking
 - ✅ **LLM Observability**: OpenAI prompts, completions, tokens, latency
+- ✅ **Network Performance Monitoring (NPM)**: Service-to-service network flows, latencies, retransmits
 - ✅ **Profiler**: Python continuous profiling
 - ✅ **Processes**: Live process monitoring
 - ✅ **Orchestrator Explorer**: K8s resource visibility
@@ -144,7 +145,7 @@ terraform -chdir=terraform output -raw dashboard_url
 - **6 Monitors**: Backend latency/errors, OpenAI failures, RUM errors, DB slow queries, K8s restarts
 - **3 SLOs**: Backend availability (99.5%), backend latency (p95 < 2s), frontend error-free sessions (99%)
 - **1 Dashboard**: Comprehensive overview with APM, LLM, DBM, RUM, K8s sections
-- **2 Synthetic Tests**: Frontend uptime check, backend health check (supports private location)
+- **3 Synthetic Tests**: Frontend uptime (API), backend health (API), user journey (Browser with RUM generation)
 - **5 SIEM Rules**: High error rate, SQL injection, OpenAI abuse, container escape, DB auth failures
 - **Software Catalog**: System + service entities with ownership, dependencies, and links
 - **Datadog Agent**: Deployed via Helm with full observability + security config
@@ -270,13 +271,14 @@ Correlate deployments with performance changes:
 ## Demo Use Cases
 
 This sandbox demonstrates:
-- **End-to-end observability**: RUM → APM → Logs → DBM correlation
+- **End-to-end observability**: RUM → APM → Logs → DBM → Network flows correlation
 - **Service Management**: Monitors → Incidents → Case Management
 - **SLO tracking**: Availability and latency SLOs with burn rate alerts
 - **LLM monitoring**: OpenAI usage, costs, latency, errors
-- **Kubernetes observability**: Orchestrator Explorer, resource utilization
-- **Synthetic monitoring**: Proactive uptime checks
-- **Application security**: Runtime threat detection, attack blocking (ASM)
+- **Network troubleshooting**: Service-to-service latency, connection failures, TCP metrics
+- **Kubernetes observability**: Orchestrator Explorer, resource utilization, network topology
+- **Synthetic monitoring**: Proactive uptime checks with private locations
+- **Application security**: Runtime threat detection, attack blocking (ASM, IAST)
 - **Code security**: Vulnerable dependency scanning, SAST analysis
 - **Cloud SIEM**: Log-based threat detection, security analytics
 - **Cloud security**: Container vulnerabilities, runtime threats, compliance
@@ -303,6 +305,11 @@ This demo includes **full Datadog Security Platform**. See [SECURITY_SETUP.md](S
 - ✅ Enabled automatically with 5 detection rules
 - Monitors for: High error rates, SQL injection, OpenAI abuse, container escapes, DB auth failures
 - View signals: [Security Signals Explorer](https://app.datadoghq.com/security)
+
+**Interactive Application Security Testing (IAST)**
+- ✅ Enabled automatically
+- Runtime code analysis for vulnerability detection
+- Identifies security flaws during application execution
 
 **Cloud Security Management (CSM)**
 - ✅ Enabled automatically
@@ -370,7 +377,7 @@ npm run dev
 │  ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐   │
 │  │  Frontend   │───▶│   Backend    │───▶│   Postgres      │   │
 │  │  (Next.js)  │    │  (FastAPI)   │    │   (DBM)         │   │
-│  │  NodePort   │    │              │───▶│                 │   │
+│  │  RUM + NPM  │    │  APM + NPM   │───▶│   NPM tracked   │   │
 │  │  :30080     │    │              │    │   OpenAI API    │   │
 │  └─────────────┘    └──────────────┘    └─────────────────┘   │
 │                                                                   │
