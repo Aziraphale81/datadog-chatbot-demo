@@ -2,7 +2,7 @@
 
 Minimal FastAPI + Postgres backend and Next.js frontend, fully instrumented with Datadog (APM, Logs, Metrics, RUM, DBM, LLM Observability, Profiler, Processes, Orchestrator Explorer, **Application Security, Cloud SIEM, Cloud Security Management**). Runs on the Docker Desktop Kubernetes cluster in a single namespace (`chat-demo`), exposed via NodePort.
 
-All Datadog resources (monitors, SLOs, dashboards, synthetics, security rules) are managed via Terraform for easy version control and team sharing.
+All Datadog resources (monitors, SLOs, dashboards, synthetics, security rules, Software Catalog entities) are managed via Terraform for easy version control and team sharing.
 
 <img width="800" alt="image" src="https://github.com/user-attachments/assets/1dd5cc07-409f-4f06-a88b-43010b8a8123" />
 
@@ -97,6 +97,7 @@ This will:
 - Create 5 Cloud SIEM detection rules
 - Create a comprehensive dashboard
 - Create 2 synthetic tests (frontend uptime, backend health)
+- Create 4 Software Catalog entities (backend, frontend, postgres, openai)
 
 ### 5) Access the application
 
@@ -122,6 +123,7 @@ terraform -chdir=terraform output -raw dashboard_url
 - ✅ **APM**: Distributed traces for FastAPI → OpenAI → Postgres
 - ✅ **Logs**: JSON structured logs with trace correlation
 - ✅ **DBM**: Postgres query samples and execution plans
+- ✅ **Software Catalog**: Service definitions with ownership (team:chatbot)
 - ✅ **RUM**: Browser telemetry, Session Replay, dummy user tracking
 - ✅ **LLM Observability**: OpenAI prompts, completions, tokens, latency
 - ✅ **Profiler**: Python continuous profiling
@@ -131,6 +133,7 @@ terraform -chdir=terraform output -raw dashboard_url
 
 ### Datadog Security (Full Platform)
 - ✅ **Application Security (ASM)**: Runtime threat detection, attack blocking, vulnerability management
+- ✅ **IAST**: Interactive Application Security Testing for runtime code analysis
 - ✅ **Code Security**: SAST scanning for vulnerabilities in code and dependencies
 - ✅ **Cloud SIEM**: Log-based security threat detection with 5 custom rules
 - ✅ **CSM Threats**: Runtime container security monitoring
@@ -143,6 +146,7 @@ terraform -chdir=terraform output -raw dashboard_url
 - **1 Dashboard**: Comprehensive overview with APM, LLM, DBM, RUM, K8s sections
 - **2 Synthetic Tests**: Frontend uptime check, backend health check (supports private location)
 - **5 SIEM Rules**: High error rate, SQL injection, OpenAI abuse, container escape, DB auth failures
+- **Software Catalog**: System + service entities with ownership, dependencies, and links
 - **Datadog Agent**: Deployed via Helm with full observability + security config
 - **Private Location** (optional): Run synthetic tests against localhost apps
 
@@ -249,19 +253,9 @@ Add these production tags:
 
 ⚠️ **For Local Testing**: Set up a Private Location to test your localhost app.
 
-**Quick Setup:**
-1. Create Private Location in Datadog UI
-2. Run: `./scripts/setup-private-location.sh /path/to/config.json`
-3. Add Private Location ID to `terraform/terraform.tfvars`
-4. Run: `terraform apply`
+See [PRIVATE_LOCATION_SETUP.md](PRIVATE_LOCATION_SETUP.md) for 5-minute setup guide.
 
-See [PRIVATE_LOCATION_SETUP.md](PRIVATE_LOCATION_SETUP.md) for detailed instructions.
-
-**For Production:**
-1. Deploy app with public endpoint or Private Location in production environment
-2. Update `terraform/synthetics.tf` with real URLs
-3. Add multi-step API tests for critical user journeys
-4. Consider browser tests for complex UI interactions
+**For Production:** Update `terraform/synthetics.tf` with real URLs and add multi-step tests.
 
 ### **Deployment Tracking**
 
@@ -291,10 +285,7 @@ This sandbox demonstrates:
 
 ## 🔒 Security Features
 
-This demo includes **full Datadog Security Platform**:
-
-### Quick Start
-See [SECURITY_SETUP.md](SECURITY_SETUP.md) for detailed setup and demo instructions.
+This demo includes **full Datadog Security Platform**. See [SECURITY_SETUP.md](SECURITY_SETUP.md) for testing instructions.
 
 ### What's Included
 

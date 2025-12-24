@@ -26,6 +26,7 @@
 ❌ terraform/.terraform/ (provider binaries)
 ❌ .env files (local overrides)
 ❌ k8s/secrets/ (if manually generated)
+❌ worker-config-*.json (private location credentials)
 ```
 
 ---
@@ -132,13 +133,19 @@ open http://localhost:30080
 # - Code Security: Requires GitHub integration (see SECURITY_SETUP.md)
 
 # 6. (Optional) Set up Private Location for synthetic tests
-# - See: PRIVATE_LOCATION_QUICK_START.md
+# - See: PRIVATE_LOCATION_SETUP.md
 # - Allows testing localhost apps with synthetic monitoring
 
-# 7. Check Terraform outputs
+# 7. Verify Software Catalog entities
+# - Go to: https://app.datadoghq.com/services
+# - Filter by: team:chatbot
+# - Should show: chat-backend, chat-frontend, chat-postgres, openai-api
+
+# 8. Check Terraform outputs
 cd terraform
 terraform output dashboard_url
-# Open URL → Should show dashboard with data
+terraform output software_catalog_url
+# Open URLs → Should show dashboard with data and catalog entities
 ```
 
 ---

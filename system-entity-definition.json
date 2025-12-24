@@ -1,0 +1,64 @@
+{
+  "apiVersion": "v3",
+  "kind": "system",
+  "metadata": {
+    "name": "chatbot-demo-system",
+    "displayName": "AI Chatbot Demo System",
+    "owner": "team:chatbot",
+    "description": "Full-stack AI chatbot application demonstrating Datadog's complete observability and security platform. Includes FastAPI backend, Next.js frontend, Postgres database, and OpenAI integration with comprehensive monitoring, APM, RUM, DBM, LLM Observability, and complete security stack (ASM, IAST, Cloud SIEM, CSM).",
+    "tags": [
+      "env:dev",
+      "platform:kubernetes",
+      "cloud:docker-desktop",
+      "application:chatbot-demo",
+      "demo:true"
+    ],
+    "links": [
+      {
+        "name": "Main Dashboard",
+        "type": "dashboard",
+        "url": "https://app.datadoghq.com/dashboard/YOUR_DASHBOARD_ID"
+      },
+      {
+        "name": "README Documentation",
+        "type": "doc",
+        "url": "https://github.com/Aziraphale81/datadog-chatbot-demo/blob/main/README.md"
+      },
+      {
+        "name": "Security Setup Guide",
+        "type": "runbook",
+        "url": "https://github.com/Aziraphale81/datadog-chatbot-demo/blob/main/SECURITY_SETUP.md"
+      },
+      {
+        "name": "Private Location Setup",
+        "type": "runbook",
+        "url": "https://github.com/Aziraphale81/datadog-chatbot-demo/blob/main/PRIVATE_LOCATION_SETUP.md"
+      }
+    ],
+    "contacts": [
+      {
+        "name": "Team Chatbot",
+        "type": "email",
+        "contact": "team-chatbot@example.com"
+      }
+    ]
+  },
+  "spec": {
+    "lifecycle": "sandbox",
+    "tier": "tier3",
+    "components": [
+      "service:chat-backend",
+      "service:chat-frontend",
+      "service:chat-postgres",
+      "service:openai-api"
+    ]
+  },
+  "datadog": {
+    "codeLocations": [
+      {
+        "repositoryURL": "https://github.com/Aziraphale81/datadog-chatbot-demo"
+      }
+    ]
+  }
+}
+

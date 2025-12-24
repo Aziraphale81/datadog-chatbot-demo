@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
@@ -59,7 +60,9 @@ export default function Home() {
       {reply && (
         <div className="card">
           <h3>Reply</h3>
-          <p>{reply}</p>
+          <div className="markdown-content">
+            <ReactMarkdown>{reply}</ReactMarkdown>
+          </div>
         </div>
       )}
       {error && <p className="error">{error}</p>}

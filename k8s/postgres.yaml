@@ -62,6 +62,12 @@ spec:
             - "-c"
             - "shared_preload_libraries=pg_stat_statements"
           env:
+            - name: DD_SERVICE
+              value: "chat-postgres"
+            - name: DD_ENV
+              value: "dev"
+            - name: DD_VERSION
+              value: "1.0.0"
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:

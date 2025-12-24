@@ -20,7 +20,7 @@ resource "datadog_service_level_objective" "backend_availability" {
   tags = [
     "service:${var.backend_service}",
     "env:${var.environment}",
-    "team:platform",
+    "team:chatbot",
     "managed_by:terraform"
   ]
 }

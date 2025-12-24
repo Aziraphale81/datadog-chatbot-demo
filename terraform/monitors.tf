@@ -33,7 +33,7 @@ resource "datadog_monitor" "backend_latency_p95" {
   tags = [
     "service:${var.backend_service}",
     "env:${var.environment}",
-    "team:platform",
+    "team:chatbot",
     "managed_by:terraform"
   ]
 }
@@ -68,7 +68,7 @@ resource "datadog_monitor" "backend_error_rate" {
   tags = [
     "service:${var.backend_service}",
     "env:${var.environment}",
-    "team:platform",
+    "team:chatbot",
     "managed_by:terraform"
   ]
 }

@@ -17,7 +17,7 @@ resource "helm_release" "datadog_agent" {
         appKeyExistingSecret = "datadog-keys"
         site                 = var.datadog_site
         clusterName          = var.cluster_name
-        tags                 = ["env:${var.environment}"]
+        tags                 = ["env:${var.environment}", "team:chatbot", "application:chatbot-demo"]
         
         apm = {
           enabled = true

@@ -2,6 +2,34 @@
 
 This guide shows how to set up a Datadog Private Location to run synthetic tests against your local application.
 
+## 🚀 Quick Start (5 Minutes)
+
+**1. Get Configuration File:**
+- Go to: https://app.datadoghq.com/synthetics/settings/private-locations
+- Click **"+ Private Location"**
+- Name: `docker-desktop-local`
+- Download the config file (e.g., `worker-config-local-*.json`)
+- Copy the Private Location ID (format: `pl:xxxxx-xxxxx-xxxxx`)
+
+**2. Deploy (Automated):**
+```bash
+# Script auto-detects Apple Silicon and uses Docker
+./scripts/setup-private-location.sh ./worker-config-local-*.json
+```
+
+**3. Update Terraform:**
+```bash
+# Add to terraform/terraform.tfvars:
+synthetics_private_location_id = "pl:your-id-here"
+
+# Apply
+cd terraform && terraform apply
+```
+
+**Done!** Tests will now run from your private location. ✅
+
+---
+
 ## Why Use a Private Location?
 
 Your app runs on `localhost:30080` (Docker Desktop Kubernetes), which isn't accessible from Datadog's public synthetic testing locations. A Private Location allows you to:

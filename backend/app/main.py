@@ -177,7 +177,7 @@ async def call_openai(prompt: str) -> str:
     response = await client.chat.completions.create(
         model=OPENAI_MODEL,
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=200,
+        max_tokens=1000,  # Increased from 200 to allow fuller responses
     )
     try:
         message = response.choices[0].message.content  # type: ignore[assignment]

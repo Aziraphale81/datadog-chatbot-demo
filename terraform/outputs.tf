@@ -32,3 +32,19 @@ output "synthetic_test_ids" {
   }
 }
 
+output "software_catalog_entities" {
+  description = "Software Catalog entity names"
+  value = {
+    system    = "chatbot-demo-system"
+    backend   = var.backend_service
+    frontend  = var.frontend_service
+    postgres  = "chat-postgres"
+    openai    = "openai-api"
+  }
+}
+
+output "software_catalog_url" {
+  description = "Software Catalog URL"
+  value       = "https://app.${var.datadog_site}/software-catalog?owner=team%3Achatbot"
+}
+
