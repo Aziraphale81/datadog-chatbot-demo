@@ -64,3 +64,9 @@ variable "alert_slack_channel" {
   default     = ""
 }
 
+variable "synthetics_private_location_id" {
+  description = "Datadog Synthetics Private Location ID (leave empty to use public locations)"
+  type        = string
+  default     = ""
+}
+

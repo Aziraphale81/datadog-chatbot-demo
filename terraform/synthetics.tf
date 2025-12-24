@@ -1,4 +1,10 @@
 # Synthetic Tests
+#
+# Note: These tests use localhost:30080 URLs, which work with Docker-based
+# private locations using --network host. If using Kubernetes Helm-based
+# private location, you may want to use internal K8s service URLs instead:
+#   - Frontend: http://frontend.chat-demo.svc.cluster.local
+#   - Backend: http://backend.chat-demo.svc.cluster.local:8000
 
 # HTTP check for frontend availability
 resource "datadog_synthetics_test" "frontend_uptime" {
@@ -20,7 +26,7 @@ resource "datadog_synthetics_test" "frontend_uptime" {
 
   request_definition {
     method = "GET"
-    url    = "http://localhost:30080"  # Note: Update to public URL for production (localhost won't work from Datadog's synthetic locations)
+    url    = "http://localhost:30080"
   }
 
   assertion {
@@ -46,7 +52,7 @@ resource "datadog_synthetics_test" "frontend_uptime" {
     }
   }
 
-  locations = ["aws:us-east-1"]  # Single location for cost optimization. Production: add ["aws:us-west-2", "aws:eu-west-1"]
+  locations = var.synthetics_private_location_id != "" ? [var.synthetics_private_location_id] : ["aws:us-east-1"]
 
   tags = [
     "service:${var.frontend_service}",
@@ -55,22 +61,31 @@ resource "datadog_synthetics_test" "frontend_uptime" {
   ]
 }
 
-# API test for backend health endpoint
+# API test for backend via chat endpoint (tests full stack)
 resource "datadog_synthetics_test" "backend_health" {
-  name    = "${var.environment} - Backend Health Check"
+  name    = "${var.environment} - Backend API Check (via Chat)"
   type    = "api"
   subtype = "http"
   status  = "live"
   message = <<-EOT
-    Backend health endpoint is failing.
+    Backend API is failing (tested via chat endpoint).
+    
+    This tests the full stack: Frontend → Backend → OpenAI → Database
     
     ${var.alert_email != "" ? "@${var.alert_email}" : ""}
     ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
   EOT
 
   request_definition {
-    method = "GET"
-    url    = "http://backend.${var.namespace}.svc.cluster.local:8000/health"
+    method = "POST"
+    url    = "http://localhost:30080/api/chat"
+    body   = jsonencode({
+      prompt = "health check"
+    })
+  }
+  
+  request_headers = {
+    "Content-Type" = "application/json"
   }
 
   assertion {
@@ -82,13 +97,13 @@ resource "datadog_synthetics_test" "backend_health" {
   assertion {
     type     = "body"
     operator = "contains"
-    target   = "ok"
+    target   = "reply"
   }
 
   assertion {
     type     = "responseTime"
     operator = "lessThan"
-    target   = "1000"
+    target   = "5000"  # Increased for OpenAI latency
   }
 
   options_list {
@@ -102,7 +117,7 @@ resource "datadog_synthetics_test" "backend_health" {
     }
   }
 
-  locations = ["aws:us-east-1"]  # Single location for cost optimization
+  locations = var.synthetics_private_location_id != "" ? [var.synthetics_private_location_id] : ["aws:us-east-1"]
 
   tags = [
     "service:${var.backend_service}",

@@ -17,3 +17,8 @@ frontend_service = "chat-frontend"
 alert_email         = "your-email@example.com"
 alert_slack_channel = "@slack-alerts"
 
+# Optional: Private Location for Synthetic Tests
+# Get the ID from: https://app.datadoghq.com/synthetics/settings/private-locations
+# Format: "pl:your-private-location-id"
+synthetics_private_location_id = ""
+

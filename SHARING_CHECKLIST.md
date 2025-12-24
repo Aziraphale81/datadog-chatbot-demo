@@ -131,7 +131,11 @@ open http://localhost:30080
 # - CSM: security/csm → Container images and K8s posture
 # - Code Security: Requires GitHub integration (see SECURITY_SETUP.md)
 
-# 6. Check Terraform outputs
+# 6. (Optional) Set up Private Location for synthetic tests
+# - See: PRIVATE_LOCATION_QUICK_START.md
+# - Allows testing localhost apps with synthetic monitoring
+
+# 7. Check Terraform outputs
 cd terraform
 terraform output dashboard_url
 # Open URL → Should show dashboard with data

@@ -141,9 +141,10 @@ terraform -chdir=terraform output -raw dashboard_url
 - **6 Monitors**: Backend latency/errors, OpenAI failures, RUM errors, DB slow queries, K8s restarts
 - **3 SLOs**: Backend availability (99.5%), backend latency (p95 < 2s), frontend error-free sessions (99%)
 - **1 Dashboard**: Comprehensive overview with APM, LLM, DBM, RUM, K8s sections
-- **2 Synthetic Tests**: Frontend uptime check, backend health check
+- **2 Synthetic Tests**: Frontend uptime check, backend health check (supports private location)
 - **5 SIEM Rules**: High error rate, SQL injection, OpenAI abuse, container escape, DB auth failures
 - **Datadog Agent**: Deployed via Helm with full observability + security config
+- **Private Location** (optional): Run synthetic tests against localhost apps
 
 ---
 
@@ -246,10 +247,18 @@ Add these production tags:
 
 ### **Synthetic Tests**
 
-⚠️ **Current Setup Issue**: Synthetic tests use `localhost` URLs which won't work from Datadog's locations.
+⚠️ **For Local Testing**: Set up a Private Location to test your localhost app.
+
+**Quick Setup:**
+1. Create Private Location in Datadog UI
+2. Run: `./scripts/setup-private-location.sh /path/to/config.json`
+3. Add Private Location ID to `terraform/terraform.tfvars`
+4. Run: `terraform apply`
+
+See [PRIVATE_LOCATION_SETUP.md](PRIVATE_LOCATION_SETUP.md) for detailed instructions.
 
 **For Production:**
-1. Deploy app with public endpoint or VPN
+1. Deploy app with public endpoint or Private Location in production environment
 2. Update `terraform/synthetics.tf` with real URLs
 3. Add multi-step API tests for critical user journeys
 4. Consider browser tests for complex UI interactions
