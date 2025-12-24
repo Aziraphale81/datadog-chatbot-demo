@@ -126,7 +126,7 @@ terraform -chdir=terraform output -raw dashboard_url
 - ✅ **Software Catalog**: Service definitions with ownership (team:chatbot)
 - ✅ **RUM**: Browser telemetry, Session Replay, dummy user tracking
 - ✅ **LLM Observability**: OpenAI prompts, completions, tokens, latency
-- ✅ **Network Performance Monitoring (NPM)**: Service-to-service network flows, latencies, retransmits
+- ✅ **Cloud Network Monitoring (CNM)**: Service-to-service network flows, latencies, retransmits
 - ✅ **Profiler**: Python continuous profiling
 - ✅ **Processes**: Live process monitoring
 - ✅ **Orchestrator Explorer**: K8s resource visibility
