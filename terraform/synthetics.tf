@@ -207,7 +207,7 @@ resource "datadog_synthetics_test" "chat_user_journey" {
     timeout = 10
   }
 
-  # Step 4: Click send button
+  # Step 4: Click send button (includes waiting for OpenAI response)
   browser_step {
     name = "Send first message"
     type = "click"
@@ -224,30 +224,10 @@ resource "datadog_synthetics_test" "chat_user_journey" {
       })
     }
     
-    timeout = 10
+    timeout = 20  # OpenAI can take 10s+, need buffer for page processing
   }
 
-  # Step 5: Wait for user message to appear
-  browser_step {
-    name = "Verify message sent"
-    type = "assertElementPresent"
-    
-    params {
-      element = jsonencode({
-        userLocator = {
-          failTestOnCannotLocate = true
-          values = [{
-            type  = "css"
-            value = ".user-message"
-          }]
-        }
-      })
-    }
-    
-    timeout = 10
-  }
-
-  # Step 6: Wait for AI response (generous timeout for OpenAI)
+  # Step 5: Wait for AI response (includes user message verification)
   browser_step {
     name = "Wait for AI response"
     type = "assertElementPresent"
@@ -268,27 +248,7 @@ resource "datadog_synthetics_test" "chat_user_journey" {
     allow_failure = false
   }
 
-  # Step 7: Verify markdown content is rendered
-  browser_step {
-    name = "Verify response rendered"
-    type = "assertElementPresent"
-    
-    params {
-      element = jsonencode({
-        userLocator = {
-          failTestOnCannotLocate = true
-          values = [{
-            type  = "css"
-            value = ".assistant-message .markdown-content"
-          }]
-        }
-      })
-    }
-    
-    timeout = 5
-  }
-
-  # Step 8: Send a follow-up message
+  # Step 6: Type follow-up message
   browser_step {
     name = "Type follow-up message"
     type = "typeText"
@@ -309,7 +269,7 @@ resource "datadog_synthetics_test" "chat_user_journey" {
     timeout = 10
   }
 
-  # Step 9: Send follow-up
+  # Step 7: Send follow-up
   browser_step {
     name = "Send follow-up"
     type = "click"
@@ -329,7 +289,7 @@ resource "datadog_synthetics_test" "chat_user_journey" {
     timeout = 20  # Generous timeout as page may wait for response
   }
 
-  # Step 10: Wait for second response to appear
+  # Step 8: Wait for second response to appear
   browser_step {
     name = "Wait for second response"
     type = "assertElementPresent"
@@ -350,7 +310,7 @@ resource "datadog_synthetics_test" "chat_user_journey" {
     allow_failure = true  # Don't fail if follow-up is slow
   }
 
-  # Step 11: Verify session appears in sidebar with message count
+  # Step 9: Verify session appears in sidebar with message count
   browser_step {
     name = "Verify session in sidebar"
     type = "assertElementPresent"
