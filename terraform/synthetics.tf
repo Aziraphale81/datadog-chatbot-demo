@@ -332,7 +332,7 @@ resource "datadog_synthetics_test" "chat_user_journey" {
   }
 
   options_list {
-    tick_every         = 900  # 15 minutes (generates RUM data regularly)
+    tick_every         = 3600
     follow_redirects   = true
     min_failure_duration = 600
     min_location_failed = 1
