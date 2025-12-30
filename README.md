@@ -1,6 +1,6 @@
 # Local Chatbot + Datadog on Docker Desktop Kubernetes
 
-Minimal FastAPI + Postgres backend and Next.js frontend, fully instrumented with Datadog (APM, Logs, Metrics, RUM, DBM, LLM Observability, Profiler, Processes, Orchestrator Explorer, **Application Security, Cloud SIEM, Cloud Security Management**). Runs on the Docker Desktop Kubernetes cluster in a single namespace (`chat-demo`), exposed via NodePort.
+AI chatbot with async message processing via RabbitMQ and Apache Airflow analytics jobs, featuring FastAPI backend, Next.js frontend, Postgres database, and OpenAI integration. Fully instrumented with Datadog (APM, **Data Streams Monitoring (DSM)**, **Data Jobs Monitoring (DJM)**, Logs, Metrics, RUM, DBM, LLM Observability, CNM, Profiler, Processes, Orchestrator Explorer, **Application Security, Cloud SIEM, Cloud Security Management**). Runs on the Docker Desktop Kubernetes cluster in a single namespace (`chat-demo`), exposed via NodePort.
 
 All Datadog resources (monitors, SLOs, dashboards, synthetics, security rules, Software Catalog entities) are managed via Terraform for easy version control and team sharing.
 
@@ -17,10 +17,10 @@ chmod +x scripts/setup.sh scripts/teardown.sh
 ```
 
 This script will:
-1. Build Docker images for backend and frontend
+1. Build Docker images for backend, frontend, and worker
 2. Create Kubernetes namespace
 3. Prompt for secrets if not already created
-4. Deploy application stack (Postgres, backend, frontend)
+4. Deploy application stack (Postgres, RabbitMQ, backend, worker, frontend)
 5. Deploy Datadog Agent via Terraform
 6. Create monitors, SLOs, dashboards, and synthetic tests
 
@@ -51,6 +51,7 @@ kubectl create secret generic openai-key -n chat-demo \
 
 ```bash
 docker build -t chat-backend:latest ./backend
+docker build -t chat-worker:latest ./worker
 
 # Frontend needs RUM credentials at build time
 export DD_RUM_CLIENT_TOKEN=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.rum-client-token}' | base64 -d)
@@ -71,7 +72,9 @@ docker build -t chat-frontend:latest \
 
 ```bash
 kubectl apply -f k8s/postgres.yaml
+kubectl apply -f k8s/rabbitmq.yaml
 kubectl apply -f k8s/backend.yaml
+kubectl apply -f k8s/worker.yaml
 kubectl apply -f k8s/frontend.yaml
 ```
 
@@ -97,7 +100,7 @@ This will:
 - Create 5 Cloud SIEM detection rules
 - Create a comprehensive dashboard
 - Create 3 synthetic tests (frontend uptime, backend health, browser user journey)
-- Create 4 Software Catalog entities (backend, frontend, postgres, openai)
+- Create 6 Software Catalog entities (backend, frontend, postgres, rabbitmq, worker, openai)
 
 ### 5) Access the application
 
@@ -114,18 +117,22 @@ terraform -chdir=terraform output -raw dashboard_url
 ## What's Included
 
 ### Application Stack
-- **Backend**: FastAPI with OpenAI integration, Postgres persistence
-- **Frontend**: Next.js with RUM + Session Replay
-- **Database**: Postgres with DBM enabled
+- **Backend**: FastAPI API service that publishes chat requests to RabbitMQ queue
+- **Worker**: Python async worker that consumes from queue, calls OpenAI, publishes responses
+- **Frontend**: Next.js with RUM + Session Replay, polls for async responses
+- **Message Broker**: RabbitMQ for async chat processing with DSM instrumentation
+- **Database**: Postgres with DBM enabled for message persistence
 - **Kubernetes**: Single namespace deployment on Docker Desktop
 
 ### Datadog Observability (Full Stack)
-- ✅ **APM**: Distributed traces for FastAPI → OpenAI → Postgres with inferred services
+- ✅ **APM**: Distributed traces for FastAPI → RabbitMQ → Worker → OpenAI with inferred services
+- ✅ **Data Streams Monitoring (DSM)**: End-to-end message flow tracking through RabbitMQ queues with latency and lag monitoring
+- ✅ **Data Jobs Monitoring (DJM)**: Apache Airflow job orchestration with 3 analytics DAGs (daily summaries, token usage, session cleanup)
 - ✅ **Logs**: JSON structured logs with trace correlation
 - ✅ **DBM**: Postgres query samples and execution plans
-- ✅ **Software Catalog**: Service definitions with ownership (team:chatbot)
+- ✅ **Software Catalog**: System + 7 service entities with ownership (team:chatbot)
 - ✅ **RUM**: Browser telemetry, Session Replay, dummy user tracking
-- ✅ **LLM Observability**: OpenAI prompts, completions, tokens, latency
+- ✅ **LLM Observability**: OpenAI prompts, completions, tokens, latency tracking
 - ✅ **Cloud Network Monitoring (CNM)**: Service-to-service network flows, latencies, retransmits
 - ✅ **Profiler**: Python continuous profiling
 - ✅ **Processes**: Live process monitoring
@@ -147,9 +154,90 @@ terraform -chdir=terraform output -raw dashboard_url
 - **1 Dashboard**: Comprehensive overview with APM, LLM, DBM, RUM, K8s sections
 - **3 Synthetic Tests**: Frontend uptime (API), backend health (API), user journey (Browser with RUM generation)
 - **5 SIEM Rules**: High error rate, SQL injection, OpenAI abuse, container escape, DB auth failures
-- **Software Catalog**: System + service entities with ownership, dependencies, and links
+- **Software Catalog**: System + 6 service entities with ownership, dependencies, and links
 - **Datadog Agent**: Deployed via Helm with full observability + security config
 - **Private Location** (optional): Run synthetic tests against localhost apps
+
+---
+
+## Data Streams Monitoring (DSM) Architecture
+
+This demo showcases **async message processing** with full DSM instrumentation for end-to-end visibility:
+
+```
+┌─────────┐      ┌─────────┐      ┌──────────┐      ┌────────┐      ┌─────────┐
+│Frontend │──────▶│ Backend │──────▶│ RabbitMQ │──────▶│ Worker │──────▶│ OpenAI  │
+│ (Next)  │      │(FastAPI)│      │  Queues  │      │(Python)│      │   API   │
+└─────────┘      └─────────┘      └──────────┘      └────────┘      └─────────┘
+    │                                   │                │
+    │                                   │                │
+    └───────────────────────────────────┴────────────────┘
+              DSM Checkpoints Tracked at Each Hop
+```
+
+### Message Flow
+1. **Frontend** → Submits chat request via API
+2. **Backend** → Publishes message to `chat_requests` queue (DSM checkpoint)
+3. **RabbitMQ** → Queues message for async processing
+4. **Worker** → Consumes message (DSM checkpoint), calls OpenAI, publishes to `chat_responses`
+5. **Backend** → Consumes response (DSM checkpoint), saves to Postgres
+6. **Frontend** → Polls for response, displays to user
+
+### DSM Benefits
+- **End-to-end latency tracking**: See exactly how long messages spend in each queue
+- **Lag monitoring**: Alert on queue backlog and processing delays
+- **Throughput metrics**: Track message rates through your pipeline
+- **Service dependencies**: Visualize producer/consumer relationships
+- **Pathway analysis**: Identify bottlenecks in your async workflows
+
+### Accessing DSM in Datadog UI
+Navigate to **APM → Data Streams** to see:
+- Real-time throughput and latency graphs
+- Queue-level metrics (depth, age, consumer lag)
+- End-to-end pathway visualization
+- Producer and consumer service maps
+
+---
+
+## Data Jobs Monitoring (DJM) - Apache Airflow
+
+This demo includes **3 analytics DAGs** running on Apache Airflow with full DJM instrumentation:
+
+### Analytics Jobs
+
+| DAG | Schedule | Purpose |
+|-----|----------|---------|
+| **`daily_chat_summary`** | 1 AM daily | Aggregate chat stats: message counts, sessions, no-answer rate, avg messages/session |
+| **`token_usage_report`** | 2 AM daily | Calculate OpenAI token usage and estimated costs (input/output tokens) |
+| **`session_cleanup`** | 3 AM Sunday | Identify inactive sessions (>30 days old) for archival or cleanup |
+
+### DJM Benefits
+- **Job execution tracking**: See which DAGs ran, when, and for how long
+- **Failure detection**: Alert on failed jobs or anomalous runtimes
+- **Performance trends**: Track job duration over time
+- **Cost optimization**: Identify expensive or slow jobs
+
+### Accessing DJM in Datadog UI
+1. Navigate to **APM → Data Jobs**
+2. Filter by `service:chat-airflow`
+3. View:
+   - Job run history and success rates
+   - Execution duration trends
+   - Failed task details
+   - Schedule compliance
+
+### Airflow UI
+Access locally at `http://localhost:30808`
+- **Username**: `admin`
+- **Password**: `admin`
+- View DAGs, trigger manual runs, check logs
+
+### Triggering Jobs Manually
+```bash
+# Access Airflow pod
+kubectl exec -n chat-demo deployment/airflow -- \
+  airflow dags trigger daily_chat_summary
+```
 
 ---
 

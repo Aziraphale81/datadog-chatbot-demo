@@ -1,0 +1,439 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow
+  namespace: chat-demo
+  labels:
+    app: airflow
+    tags.datadoghq.com/service: chat-airflow
+    tags.datadoghq.com/env: demo
+spec:
+  type: NodePort
+  ports:
+    - name: web
+      port: 8080
+      targetPort: 8080
+      nodePort: 30808
+  selector:
+    app: airflow
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow
+  namespace: chat-demo
+  labels:
+    app: airflow
+    tags.datadoghq.com/service: chat-airflow
+    tags.datadoghq.com/env: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow
+  template:
+    metadata:
+      labels:
+        app: airflow
+        tags.datadoghq.com/service: chat-airflow
+        tags.datadoghq.com/env: demo
+        team: chatbot
+        admission.datadoghq.com/enabled: "true"
+      annotations:
+        ad.datadoghq.com/airflow.logs: '[{"source":"airflow","service":"chat-airflow"}]'
+    spec:
+      initContainers:
+        - name: init-airflow
+          image: apache/airflow:2.10.4-python3.11
+          command:
+            - bash
+            - -c
+            - |
+              airflow db migrate
+              airflow users create \
+                --username admin \
+                --password admin \
+                --firstname Admin \
+                --lastname User \
+                --role Admin \
+                --email admin@example.com || true
+          env:
+            - name: AIRFLOW__CORE__EXECUTOR
+              value: "LocalExecutor"
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: "postgresql://postgres:postgres@postgres:5432/postgres"
+            - name: AIRFLOW__CORE__DAGS_FOLDER
+              value: "/opt/airflow/dags"
+            - name: AIRFLOW__CORE__LOAD_EXAMPLES
+              value: "False"
+          volumeMounts:
+            - name: airflow-data
+              mountPath: /opt/airflow
+            - name: dags
+              mountPath: /opt/airflow/dags
+      containers:
+        - name: airflow
+          image: apache/airflow:2.10.4-python3.11
+          command:
+            - bash
+            - -c
+            - |
+              pip install --no-cache-dir psycopg2-binary openai ddtrace
+              # Copy DAGs from ConfigMap to avoid symlink recursion issues
+              mkdir -p /opt/airflow/dags_clean
+              cp /opt/airflow/dags/*.py /opt/airflow/dags_clean/ 2>/dev/null || true
+              # Start webserver only (scheduler causes timeout in demo environment)
+              # DAGs can be triggered manually via UI at localhost:30808
+              exec airflow webserver
+          ports:
+            - containerPort: 8080
+              name: web
+          env:
+            # Airflow Configuration
+            - name: AIRFLOW__CORE__EXECUTOR
+              value: "LocalExecutor"
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: "postgresql://postgres:postgres@postgres:5432/postgres"
+            - name: AIRFLOW__CORE__DAGS_FOLDER
+              value: "/opt/airflow/dags_clean"
+            - name: AIRFLOW__CORE__LOAD_EXAMPLES
+              value: "False"
+            - name: AIRFLOW__WEBSERVER__EXPOSE_CONFIG
+              value: "True"
+            - name: AIRFLOW__WEBSERVER__SECRET_KEY
+              value: "demo_secret_key_change_in_prod"
+            
+            # Datadog Configuration for DJM
+            - name: DD_SERVICE
+              value: "chat-airflow"
+            - name: DD_ENV
+              value: "demo"
+            - name: DD_VERSION
+              value: "1.0.0"
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            
+            # Airflow StatsD Configuration (for Datadog metrics integration)
+            - name: AIRFLOW__METRICS__STATSD_ON
+              value: "True"
+            - name: AIRFLOW__METRICS__STATSD_HOST
+              value: "$(DD_AGENT_HOST)"
+            - name: AIRFLOW__METRICS__STATSD_PORT
+              value: "8125"
+            - name: AIRFLOW__METRICS__STATSD_PREFIX
+              value: "airflow"
+            - name: DD_TRACE_AGENT_URL
+              value: "http://$(DD_AGENT_HOST):8126"
+            - name: DD_LOGS_INJECTION
+              value: "true"
+            - name: DD_TRACE_ENABLED
+              value: "true"
+            - name: DD_DATA_JOBS_ENABLED
+              value: "true"
+            # Filter out health check spans
+            - name: DD_TRACE_IGNORE_RESOURCE_NAMES
+              value: "GET /health"
+            
+            # Database connection for DAGs
+            - name: POSTGRES_DSN
+              value: "postgresql://postgres:postgres@postgres:5432/postgres"
+          volumeMounts:
+            - name: airflow-data
+              mountPath: /opt/airflow
+            - name: dags
+              mountPath: /opt/airflow/dags
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 300  # Check every 5 minutes (demo environment)
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 60  # Check every 1 minute (demo environment)
+            timeoutSeconds: 5
+      volumes:
+        - name: airflow-data
+          emptyDir: {}
+        - name: dags
+          configMap:
+            name: airflow-dags
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-dags
+  namespace: chat-demo
+data:
+  daily_chat_summary.py: |
+    """
+    Daily Chat Summary DAG
+    Aggregates chat statistics for the previous day
+    """
+    from datetime import datetime, timedelta
+    from airflow import DAG
+    from airflow.operators.python import PythonOperator
+    import psycopg2
+    import logging
+    import os
+    
+    logger = logging.getLogger(__name__)
+    
+    def calculate_daily_stats(**context):
+        """Calculate chat statistics for yesterday"""
+        execution_date = context['execution_date']
+        start_date = execution_date.replace(hour=0, minute=0, second=0)
+        end_date = start_date + timedelta(days=1)
+        
+        postgres_dsn = os.getenv('POSTGRES_DSN', 'postgresql://postgres:postgres@postgres:5432/postgres')
+        
+        conn = psycopg2.connect(postgres_dsn)
+        cursor = conn.cursor()
+        
+        # Total messages
+        cursor.execute("""
+            SELECT COUNT(*) FROM chat_messages 
+            WHERE created_at >= %s AND created_at < %s
+        """, (start_date, end_date))
+        total_messages = cursor.fetchone()[0]
+        
+        # Unique sessions
+        cursor.execute("""
+            SELECT COUNT(DISTINCT session_id) FROM chat_messages 
+            WHERE created_at >= %s AND created_at < %s
+        """, (start_date, end_date))
+        unique_sessions = cursor.fetchone()[0]
+        
+        # No answer rate
+        cursor.execute("""
+            SELECT COUNT(*) FROM chat_messages 
+            WHERE created_at >= %s AND created_at < %s AND no_answer = true
+        """, (start_date, end_date))
+        no_answer_count = cursor.fetchone()[0]
+        no_answer_rate = (no_answer_count / total_messages * 100) if total_messages > 0 else 0
+        
+        # Average messages per session
+        avg_messages = total_messages / unique_sessions if unique_sessions > 0 else 0
+        
+        cursor.close()
+        conn.close()
+        
+        stats = {
+            'date': start_date.strftime('%Y-%m-%d'),
+            'total_messages': total_messages,
+            'unique_sessions': unique_sessions,
+            'no_answer_count': no_answer_count,
+            'no_answer_rate': f"{no_answer_rate:.2f}%",
+            'avg_messages_per_session': f"{avg_messages:.2f}"
+        }
+        
+        logger.info(f"Daily Chat Summary: {stats}")
+        return stats
+    
+    default_args = {
+        'owner': 'chatbot-team',
+        'depends_on_past': False,
+        'email_on_failure': False,
+        'email_on_retry': False,
+        'retries': 1,
+        'retry_delay': timedelta(minutes=5),
+    }
+    
+    with DAG(
+        'daily_chat_summary',
+        default_args=default_args,
+        description='Daily aggregation of chat statistics',
+        schedule_interval='0 1 * * *',  # 1 AM daily
+        start_date=datetime(2025, 1, 1),
+        catchup=False,
+        tags=['analytics', 'daily', 'chatbot'],
+    ) as dag:
+        
+        calculate_stats = PythonOperator(
+            task_id='calculate_daily_stats',
+            python_callable=calculate_daily_stats,
+            provide_context=True,
+        )
+
+  token_usage_report.py: |
+    """
+    Token Usage Report DAG
+    Calculates OpenAI API usage and estimated costs
+    """
+    from datetime import datetime, timedelta
+    from airflow import DAG
+    from airflow.operators.python import PythonOperator
+    import psycopg2
+    import logging
+    import os
+    
+    logger = logging.getLogger(__name__)
+    
+    # Pricing (as of GPT-5-nano example - adjust for your model)
+    PRICE_PER_1K_INPUT = 0.05
+    PRICE_PER_1K_OUTPUT = 0.4
+    
+    def calculate_token_usage(**context):
+        """Calculate token usage and costs"""
+        execution_date = context['execution_date']
+        start_date = execution_date.replace(hour=0, minute=0, second=0)
+        end_date = start_date + timedelta(days=1)
+        
+        postgres_dsn = os.getenv('POSTGRES_DSN', 'postgresql://postgres:postgres@postgres:5432/postgres')
+        
+        conn = psycopg2.connect(postgres_dsn)
+        cursor = conn.cursor()
+        
+        # Estimate tokens (rough calculation: 1 token ≈ 4 chars)
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as message_count,
+                SUM(LENGTH(prompt)) as total_prompt_chars,
+                SUM(LENGTH(reply)) as total_reply_chars
+            FROM chat_messages 
+            WHERE created_at >= %s AND created_at < %s
+        """, (start_date, end_date))
+        
+        result = cursor.fetchone()
+        message_count = result[0] or 0
+        total_prompt_chars = result[1] or 0
+        total_reply_chars = result[2] or 0
+        
+        cursor.close()
+        conn.close()
+        
+        # Estimate tokens (rough approximation)
+        estimated_input_tokens = total_prompt_chars / 4
+        estimated_output_tokens = total_reply_chars / 4
+        
+        # Calculate costs
+        input_cost = (estimated_input_tokens / 1000) * PRICE_PER_1K_INPUT
+        output_cost = (estimated_output_tokens / 1000) * PRICE_PER_1K_OUTPUT
+        total_cost = input_cost + output_cost
+        
+        report = {
+            'date': start_date.strftime('%Y-%m-%d'),
+            'message_count': message_count,
+            'estimated_input_tokens': int(estimated_input_tokens),
+            'estimated_output_tokens': int(estimated_output_tokens),
+            'estimated_cost_usd': f"${total_cost:.4f}",
+            'input_cost': f"${input_cost:.4f}",
+            'output_cost': f"${output_cost:.4f}"
+        }
+        
+        logger.info(f"Token Usage Report: {report}")
+        return report
+    
+    default_args = {
+        'owner': 'chatbot-team',
+        'depends_on_past': False,
+        'email_on_failure': False,
+        'email_on_retry': False,
+        'retries': 1,
+        'retry_delay': timedelta(minutes=5),
+    }
+    
+    with DAG(
+        'token_usage_report',
+        default_args=default_args,
+        description='Calculate OpenAI token usage and costs',
+        schedule_interval='0 2 * * *',  # 2 AM daily
+        start_date=datetime(2025, 1, 1),
+        catchup=False,
+        tags=['analytics', 'cost', 'openai'],
+    ) as dag:
+        
+        calculate_usage = PythonOperator(
+            task_id='calculate_token_usage',
+            python_callable=calculate_token_usage,
+            provide_context=True,
+        )
+
+  session_cleanup.py: |
+    """
+    Session Cleanup DAG
+    Identifies and marks inactive sessions
+    """
+    from datetime import datetime, timedelta
+    from airflow import DAG
+    from airflow.operators.python import PythonOperator
+    import psycopg2
+    import logging
+    import os
+    
+    logger = logging.getLogger(__name__)
+    
+    def mark_inactive_sessions(**context):
+        """Mark sessions older than 30 days as inactive"""
+        execution_date = context['execution_date']
+        cutoff_date = execution_date - timedelta(days=30)
+        
+        postgres_dsn = os.getenv('POSTGRES_DSN', 'postgresql://postgres:postgres@postgres:5432/postgres')
+        
+        conn = psycopg2.connect(postgres_dsn)
+        cursor = conn.cursor()
+        
+        # Find old sessions (for demo, we just count them)
+        cursor.execute("""
+            SELECT COUNT(*) FROM sessions 
+            WHERE updated_at < %s
+        """, (cutoff_date,))
+        
+        old_session_count = cursor.fetchone()[0]
+        
+        # In production, you might:
+        # - Archive to cold storage
+        # - Delete PII
+        # - Update a status flag
+        # For demo, we just report
+        
+        cursor.close()
+        conn.close()
+        
+        result = {
+            'execution_date': execution_date.strftime('%Y-%m-%d'),
+            'cutoff_date': cutoff_date.strftime('%Y-%m-%d'),
+            'inactive_sessions_found': old_session_count
+        }
+        
+        logger.info(f"Session Cleanup Report: {result}")
+        return result
+    
+    default_args = {
+        'owner': 'chatbot-team',
+        'depends_on_past': False,
+        'email_on_failure': False,
+        'email_on_retry': False,
+        'retries': 1,
+        'retry_delay': timedelta(minutes=5),
+    }
+    
+    with DAG(
+        'session_cleanup',
+        default_args=default_args,
+        description='Identify and process inactive sessions',
+        schedule_interval='0 3 * * 0',  # 3 AM every Sunday
+        start_date=datetime(2025, 1, 1),
+        catchup=False,
+        tags=['cleanup', 'maintenance'],
+    ) as dag:
+        
+        cleanup_task = PythonOperator(
+            task_id='mark_inactive_sessions',
+            python_callable=mark_inactive_sessions,
+            provide_context=True,
+        )
+

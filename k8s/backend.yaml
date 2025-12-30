@@ -14,6 +14,9 @@ spec:
     metadata:
       labels:
         app: backend
+        tags.datadoghq.com/service: chat-backend
+        tags.datadoghq.com/env: demo
+        tags.datadoghq.com/version: "1.0.0"
       annotations:
         ad.datadoghq.com/backend.logs: >-
           [{
@@ -70,6 +73,27 @@ spec:
               value: "true"
             - name: DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED
               value: "true"
+            # Filter out health check spans
+            - name: DD_TRACE_IGNORE_RESOURCE_NAMES
+              value: "GET /health"
+            # Data Streams Monitoring - KEY CONFIG
+            - name: DD_DATA_STREAMS_ENABLED
+              value: "true"
+            
+            # RabbitMQ Configuration
+            - name: RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_USER
+              value: "guest"
+            - name: RABBITMQ_PASS
+              value: "guest"
+            - name: REQUEST_QUEUE
+              value: "chat_requests"
+            - name: RESPONSE_QUEUE
+              value: "chat_responses"
+            
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -97,7 +121,7 @@ spec:
               path: /health
               port: 8000
             initialDelaySeconds: 10
-            periodSeconds: 60
+            periodSeconds: 300  # Check every 5 minutes (demo, filtered by DD_TRACE_IGNORE_RESOURCE_NAMES)
 ---
 apiVersion: v1
 kind: Service

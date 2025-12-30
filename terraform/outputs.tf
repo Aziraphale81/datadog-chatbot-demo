@@ -21,7 +21,7 @@ output "slo_ids" {
 
 output "dashboard_url" {
   description = "URL to the main dashboard"
-  value       = "https://app.${var.datadog_site}/dashboard/${datadog_dashboard.chatbot_overview.id}"
+  value       = "https://app.${var.datadog_site}/dashboard/${datadog_dashboard_json.chatbot_overview.id}"
 }
 
 output "synthetic_test_ids" {

@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat-worker
+  namespace: chat-demo
+  labels:
+    app: chat-worker
+    tags.datadoghq.com/service: chat-worker
+    tags.datadoghq.com/env: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chat-worker
+  template:
+    metadata:
+      labels:
+        app: chat-worker
+        tags.datadoghq.com/service: chat-worker
+        tags.datadoghq.com/env: demo
+        team: chatbot
+        admission.datadoghq.com/enabled: "true"
+      annotations:
+        ad.datadoghq.com/chat-worker.logs: '[{"source":"python","service":"chat-worker"}]'
+    spec:
+      containers:
+        - name: chat-worker
+          image: chat-worker:latest
+          imagePullPolicy: Never
+          env:
+            # Datadog Configuration
+            - name: DD_SERVICE
+              value: "chat-worker"
+            - name: DD_ENV
+              value: "demo"
+            - name: DD_VERSION
+              value: "1.0.0"
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_TRACE_AGENT_URL
+              value: "http://$(DD_AGENT_HOST):8126"
+            - name: DD_LOGS_INJECTION
+              value: "true"
+            - name: DD_TRACE_SAMPLE_RATE
+              value: "1.0"
+            - name: DD_TRACE_ENABLED
+              value: "true"
+            # Data Streams Monitoring - KEY CONFIG
+            - name: DD_DATA_STREAMS_ENABLED
+              value: "true"
+            - name: DD_TRACE_REMOVE_INTEGRATION_SERVICE_NAMES_ENABLED
+              value: "true"
+            
+            # RabbitMQ Configuration
+            - name: RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_USER
+              value: "guest"
+            - name: RABBITMQ_PASS
+              value: "guest"
+            - name: REQUEST_QUEUE
+              value: "chat_requests"
+            - name: RESPONSE_QUEUE
+              value: "chat_responses"
+            
+            # OpenAI Configuration
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openai-key
+                  key: openai-api-key
+            - name: OPENAI_MODEL
+              value: "gpt-5-nano"
+          
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+

@@ -35,6 +35,9 @@ echo "Step 1: Building Docker images..."
 echo "Building backend..."
 docker build -t chat-backend:latest ./backend
 
+echo "Building worker..."
+docker build -t chat-worker:latest ./worker
+
 echo "Building frontend..."
 # Get RUM credentials from secrets if they exist, otherwise prompt
 if kubectl get secret datadog-keys -n chat-demo >/dev/null 2>&1; then
@@ -130,7 +133,10 @@ fi
 echo ""
 echo "Step 5: Deploying Kubernetes resources..."
 kubectl apply -f k8s/postgres.yaml
+kubectl apply -f k8s/rabbitmq.yaml
+kubectl apply -f k8s/airflow.yaml
 kubectl apply -f k8s/backend.yaml
+kubectl apply -f k8s/worker.yaml
 kubectl apply -f k8s/frontend.yaml
 
 echo ""

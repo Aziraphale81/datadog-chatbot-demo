@@ -257,3 +257,270 @@ resource "datadog_monitor" "pod_restarts" {
 #   ]
 # }
 
+# RabbitMQ Queue Depth Monitor
+resource "datadog_monitor" "rabbitmq_queue_depth" {
+  name    = "[${var.environment}] RabbitMQ Queue Depth is high"
+  type    = "metric alert"
+  message = <<-EOT
+    RabbitMQ queue depth has exceeded threshold indicating message backlog.
+    
+    Check:
+    - Worker service health and processing rate
+    - Backend message publishing rate
+    - Consumer lag in DSM dashboards
+    
+    ${var.alert_email != "" ? "@${var.alert_email}" : ""}
+    ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
+  EOT
+
+  query = "avg(last_5m):sum:rabbitmq.queue.messages{service:chat-rabbitmq,env:${var.environment}} > 100"
+
+  monitor_thresholds {
+    critical = 100
+    warning  = 50
+  }
+
+  notify_no_data    = false
+  renotify_interval = 30
+  notify_audit      = false
+  timeout_h         = 1
+  include_tags      = true
+  priority          = 2
+
+  tags = [
+    "service:chat-rabbitmq",
+    "env:${var.environment}",
+    "team:chatbot",
+    "category:dsm",
+    "managed_by:terraform"
+  ]
+}
+
+# Airflow DAG Failure Monitor
+resource "datadog_monitor" "airflow_dag_failures" {
+  name    = "[${var.environment}] Airflow DAG Failures detected"
+  type    = "metric alert"
+  message = <<-EOT
+    Airflow DAG execution failures detected.
+    
+    Check:
+    - Airflow UI at http://localhost:30808
+    - Task logs for error details
+    - Database connectivity
+    - DJM dashboards for job health
+    
+    ${var.alert_email != "" ? "@${var.alert_email}" : ""}
+    ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
+  EOT
+
+  query = "sum(last_15m):sum:airflow.dag.task.failed{service:chat-airflow,env:${var.environment}} > 3"
+
+  monitor_thresholds {
+    critical = 3
+    warning  = 1
+  }
+
+  notify_no_data    = false
+  renotify_interval = 60
+  notify_audit      = false
+  timeout_h         = 1
+  include_tags      = true
+  priority          = 2
+
+  tags = [
+    "service:chat-airflow",
+    "env:${var.environment}",
+    "team:chatbot",
+    "category:djm",
+    "managed_by:terraform"
+  ]
+}
+
+# === End-to-End Journey Monitors ===
+
+# Worker Error Rate
+resource "datadog_monitor" "worker_error_rate" {
+  name    = "[${var.environment}] Worker Error Rate is high"
+  type    = "metric alert"
+  message = <<-EOT
+    The chat-worker service has exceeded 10 errors in the last 5 minutes.
+    
+    This impacts the chat processing pipeline:
+    - Messages stuck in RabbitMQ queue
+    - Users experiencing timeouts
+    - OpenAI API integration failures
+    
+    Check:
+    - Worker pod logs for exceptions
+    - OpenAI API key validity
+    - RabbitMQ connection health
+    - DSM pathway for bottlenecks
+    
+    ${var.alert_email != "" ? "@${var.alert_email}" : ""}
+    ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
+  EOT
+
+  query = "sum(last_5m):sum:trace.http.request.errors{service:chat-worker,env:${var.environment}} > 10"
+
+  monitor_thresholds {
+    critical = 10
+    warning  = 5
+  }
+
+  notify_no_data    = false
+  renotify_interval = 30
+  notify_audit      = false
+  timeout_h         = 1
+  include_tags      = true
+  priority          = 2
+
+  tags = [
+    "service:chat-worker",
+    "env:${var.environment}",
+    "team:chatbot",
+    "category:dsm",
+    "slo_component:true",
+    "managed_by:terraform"
+  ]
+}
+
+# OpenAI API Error Rate (from LLM Observability)
+resource "datadog_monitor" "openai_api_errors" {
+  name    = "[${var.environment}] OpenAI API Error Rate is high"
+  type    = "metric alert"
+  message = <<-EOT
+    OpenAI API calls are experiencing high error rates.
+    
+    This directly blocks chat responses for users.
+    
+    Check:
+    - LLM Observability dashboard
+    - OpenAI API status page
+    - API key validity and quotas
+    - Rate limiting issues
+    - Model availability (gpt-5-nano)
+    
+    ${var.alert_email != "" ? "@${var.alert_email}" : ""}
+    ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
+  EOT
+
+  query = "sum(last_5m):sum:trace.openai.request.error{env:${var.environment}} > 5"
+
+  monitor_thresholds {
+    critical = 5
+    warning  = 2
+  }
+
+  notify_no_data    = false
+  renotify_interval = 30
+  notify_audit      = false
+  timeout_h         = 1
+  include_tags      = true
+  priority          = 1  # Critical - blocks all chat
+
+  tags = [
+    "service:openai-api",
+    "env:${var.environment}",
+    "team:chatbot",
+    "category:llm",
+    "slo_component:true",
+    "managed_by:terraform"
+  ]
+}
+
+# Frontend API Route Errors
+resource "datadog_monitor" "frontend_api_errors" {
+  name    = "[${var.environment}] Frontend API Route Error Rate is high"
+  type    = "metric alert"
+  message = <<-EOT
+    Frontend API routes (/api/chat, /api/sessions) are experiencing errors.
+    
+    This impacts the user's ability to:
+    - Send chat messages
+    - Load chat history
+    - Create new sessions
+    
+    Check:
+    - Frontend pod logs
+    - Backend connectivity from frontend
+    - Next.js API route health
+    - Network policies
+    
+    ${var.alert_email != "" ? "@${var.alert_email}" : ""}
+    ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
+  EOT
+
+  query = "sum(last_5m):sum:trace.http.request.errors{service:chat-frontend,env:${var.environment}} > 10"
+
+  monitor_thresholds {
+    critical = 10
+    warning  = 5
+  }
+
+  notify_no_data    = false
+  renotify_interval = 30
+  notify_audit      = false
+  timeout_h         = 1
+  include_tags      = true
+  priority          = 2
+
+  tags = [
+    "service:chat-frontend",
+    "env:${var.environment}",
+    "team:chatbot",
+    "category:api",
+    "slo_component:true",
+    "managed_by:terraform"
+  ]
+}
+
+# RUM Error Rate (using existing RUM JS errors monitor)
+# Note: Re-use existing monitor instead of creating duplicate
+
+# RabbitMQ Connection Health
+resource "datadog_monitor" "rabbitmq_connections" {
+  name    = "[${var.environment}] RabbitMQ Connection Failures"
+  type    = "metric alert"
+  message = <<-EOT
+    RabbitMQ is experiencing connection failures or drops.
+    
+    This breaks the async message flow:
+    - Backend can't publish requests
+    - Worker can't consume messages
+    - Responses can't be delivered
+    
+    Check:
+    - RabbitMQ pod health and logs
+    - Network connectivity
+    - RabbitMQ management UI (port 15672)
+    - DSM pathway visualization
+    
+    ${var.alert_email != "" ? "@${var.alert_email}" : ""}
+    ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
+  EOT
+
+  query = "avg(last_5m):avg:rabbitmq.connections{service:chat-rabbitmq,env:${var.environment}} < 2"
+
+  monitor_thresholds {
+    critical = 2  # Expect at least backend + worker connections
+    warning  = 3
+  }
+
+  notify_no_data    = true
+  no_data_timeframe = 10
+  renotify_interval = 30
+  notify_audit      = false
+  timeout_h         = 1
+  include_tags      = true
+  priority          = 1
+
+  tags = [
+    "service:chat-rabbitmq",
+    "env:${var.environment}",
+    "team:chatbot",
+    "category:dsm",
+    "slo_component:true",
+    "managed_by:terraform"
+  ]
+}
+

@@ -26,6 +26,7 @@ export default async function handler(req, res) {
   });
 
   try {
+    // Backend now waits for worker response internally (no polling needed)
     const resp = await fetch(`${backendBase}/chat`, {
       method: "POST",
       headers: {

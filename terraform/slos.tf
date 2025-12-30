@@ -73,3 +73,91 @@ resource "datadog_service_level_objective" "frontend_error_rate" {
   ]
 }
 
+# === New SLOs for Enhanced Coverage ===
+
+# 1. End-to-End Chat Response Availability SLO (Monitor-based composite)
+resource "datadog_service_level_objective" "chat_e2e_availability" {
+  name        = "Chat Response End-to-End Availability"
+  type        = "monitor"
+  description = "99.5% availability across all components of the chat pipeline: Frontend → Backend → RabbitMQ → Worker → OpenAI → Response"
+
+  monitor_ids = [
+    datadog_monitor.frontend_api_errors.id,
+    datadog_monitor.backend_error_rate.id,
+    datadog_monitor.rabbitmq_connections.id,
+    datadog_monitor.rabbitmq_queue_depth.id,
+    datadog_monitor.worker_error_rate.id,
+    datadog_monitor.openai_api_errors.id,
+    datadog_monitor.rum_js_errors.id
+  ]
+
+  thresholds {
+    timeframe = "7d"
+    target    = 99.5
+    warning   = 99.7
+  }
+
+  tags = [
+    "service:chatbot-system",
+    "env:${var.environment}",
+    "team:chatbot",
+    "category:availability",
+    "priority:critical",
+    "managed_by:terraform"
+  ]
+}
+
+# 2. Database Query Performance SLO (using slow query monitor as proxy)
+resource "datadog_service_level_objective" "database_performance" {
+  name        = "Postgres Query Performance"
+  type        = "monitor"
+  description = "Database queries should not trigger slow query alerts to ensure snappy chat responses"
+
+  monitor_ids = [
+    datadog_monitor.postgres_slow_queries.id
+  ]
+
+  thresholds {
+    timeframe = "7d"
+    target    = 95.0
+    warning   = 97.0
+  }
+
+  tags = [
+    "service:chat-postgres",
+    "env:${var.environment}",
+    "team:chatbot",
+    "category:database",
+    "category:performance",
+    "managed_by:terraform"
+  ]
+}
+
+# 3. RabbitMQ Message Processing Time SLO (using Worker service availability as proxy)
+resource "datadog_service_level_objective" "rabbitmq_processing_availability" {
+  name        = "Chat Worker Processing Availability"
+  type        = "monitor"
+  description = "Worker should successfully process messages without errors (proxy for RabbitMQ pipeline health)"
+
+  monitor_ids = [
+    datadog_monitor.worker_error_rate.id,
+    datadog_monitor.rabbitmq_connections.id,
+    datadog_monitor.rabbitmq_queue_depth.id
+  ]
+
+  thresholds {
+    timeframe = "7d"
+    target    = 95.0
+    warning   = 97.0
+  }
+
+  tags = [
+    "service:chat-worker",
+    "env:${var.environment}",
+    "team:chatbot",
+    "category:dsm",
+    "category:availability",
+    "managed_by:terraform"
+  ]
+}
+

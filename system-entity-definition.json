@@ -5,7 +5,7 @@
     "name": "chatbot-demo-system",
     "displayName": "AI Chatbot Demo System",
     "owner": "team:chatbot",
-    "description": "Full-stack AI chatbot application demonstrating Datadog's complete observability and security platform. Includes FastAPI backend, Next.js frontend, Postgres database, and OpenAI integration with comprehensive monitoring, APM, RUM, DBM, LLM Observability, and complete security stack (ASM, IAST, Cloud SIEM, CSM).",
+    "description": "Full-stack AI chatbot application demonstrating Datadog's complete observability and security platform. Includes FastAPI backend, Next.js frontend, Postgres database, RabbitMQ message broker, Apache Airflow, and OpenAI integration with comprehensive monitoring: APM, RUM, DBM, LLM Observability, Data Streams Monitoring (DSM), Data Jobs Monitoring (DJM), and complete security stack (ASM, IAST, Cloud SIEM, CSM).",
     "tags": [
       "env:dev",
       "platform:kubernetes",
@@ -50,6 +50,9 @@
       "service:chat-backend",
       "service:chat-frontend",
       "service:chat-postgres",
+      "service:chat-rabbitmq",
+      "service:chat-worker",
+      "service:chat-airflow",
       "service:openai-api"
     ]
   },

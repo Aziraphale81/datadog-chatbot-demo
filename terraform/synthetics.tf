@@ -42,7 +42,7 @@ resource "datadog_synthetics_test" "frontend_uptime" {
   }
 
   options_list {
-    tick_every         = 300  # 5 minutes
+    tick_every         = 3600  # 1 hour (reduced to avoid excessive traces)
     follow_redirects   = true
     min_failure_duration = 300
     min_location_failed = 1
@@ -104,11 +104,11 @@ resource "datadog_synthetics_test" "backend_health" {
   assertion {
     type     = "responseTime"
     operator = "lessThan"
-    target   = "10000"  # 10s to handle OpenAI latency + full stack
+    target   = "40000"  # 40s to handle slow OpenAI responses + queue processing
   }
 
   options_list {
-    tick_every         = 300
+    tick_every         = 3600  # 1 hour (reduced to avoid excessive traces)
     follow_redirects   = true
     min_failure_duration = 300
     min_location_failed = 1

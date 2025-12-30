@@ -14,6 +14,9 @@ spec:
     metadata:
       labels:
         app: frontend
+        tags.datadoghq.com/service: chat-frontend
+        tags.datadoghq.com/env: demo
+        tags.datadoghq.com/version: "1.0.0"
       annotations:
         ad.datadoghq.com/frontend.logs: >-
           [{"source": "nodejs", "service": "chat-frontend"}]
@@ -25,8 +28,32 @@ spec:
           env:
             - name: BACKEND_INTERNAL_BASE
               value: http://backend.chat-demo.svc.cluster.local:8000
+            
+            # Datadog APM (server-side tracing for Next.js API routes)
+            - name: DD_SERVICE
+              value: chat-frontend
+            - name: DD_ENV
+              value: demo
+            - name: DD_VERSION
+              value: "1.0.0"
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DD_TRACE_AGENT_URL
+              value: http://$(DD_AGENT_HOST):8126
+            - name: DD_LOGS_INJECTION
+              value: "true"
+            - name: DD_RUNTIME_METRICS_ENABLED
+              value: "true"
+            - name: DD_PROFILING_ENABLED
+              value: "true"
+            - name: DD_APPSEC_ENABLED
+              value: "true"
             - name: DD_SOURCE
               value: nodejs
+            
+            # Datadog RUM (browser-side monitoring)
             - name: NEXT_PUBLIC_DD_CLIENT_TOKEN
               valueFrom:
                 secretKeyRef:

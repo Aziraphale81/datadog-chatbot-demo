@@ -130,9 +130,11 @@ export default function Home() {
       }
       
       const data = await res.json();
+      console.log("Received response:", data);
       
       // Update or set current session
       const newSessionId = data.session_id;
+      const isFirstMessage = messages.length === 0; // Check BEFORE updating state
       if (!currentSessionId) {
         setCurrentSessionId(newSessionId);
       }
@@ -145,7 +147,13 @@ export default function Home() {
         reply: data.reply,
         created_at: new Date().toISOString(),
       };
-      setMessages([...messages, newMessage]);
+      console.log("Adding message to state:", newMessage);
+      setMessages(prevMessages => {
+        console.log("Previous messages:", prevMessages);
+        const newState = [...prevMessages, newMessage];
+        console.log("New messages state:", newState);
+        return newState;
+      });
       
       // Clear prompt
       setPrompt("");
@@ -154,7 +162,7 @@ export default function Home() {
       await loadSessions();
       
       // Generate title if this is the first message
-      if (messages.length === 0) {
+      if (isFirstMessage) {
         setTimeout(() => generateTitle(newSessionId), 1000);
       }
       

@@ -238,3 +238,125 @@ resource "datadog_service_definition_yaml" "openai" {
     ]
   })
 }
+
+# Service Entity - RabbitMQ Message Broker
+resource "datadog_service_definition_yaml" "rabbitmq" {
+  service_definition = yamlencode({
+    schema-version = "v2.2"
+    dd-service     = "chat-rabbitmq"
+    team           = "team:chatbot"
+    application    = "chatbot-demo"
+    description    = "RabbitMQ message broker for async chat processing with Data Streams Monitoring (Erlang)"
+    tier           = "tier2"
+    lifecycle      = "sandbox"
+    contacts = [
+      {
+        type    = "email"
+        contact = var.alert_email != "" ? var.alert_email : "team-chatbot@example.com"
+      }
+    ]
+    links = [
+      {
+        name = "RabbitMQ Documentation"
+        type = "doc"
+        url  = "https://www.rabbitmq.com/documentation.html"
+      },
+      {
+        name = "Data Streams Monitoring"
+        type = "other"
+        url  = "https://app.${var.datadog_site}/data-streams"
+      }
+    ]
+    tags = [
+      "env:${var.environment}",
+      "managed_by:terraform",
+      "platform:kubernetes",
+      "messaging:rabbitmq",
+      "dsm:enabled",
+      "language:erlang"
+    ]
+  })
+}
+
+# Service Entity - Chat Worker
+resource "datadog_service_definition_yaml" "worker" {
+  service_definition = yamlencode({
+    schema-version = "v2.2"
+    dd-service     = "chat-worker"
+    team           = "team:chatbot"
+    application    = "chatbot-demo"
+    description    = "Python async worker that processes chat requests from RabbitMQ queue and calls OpenAI API"
+    tier           = "tier2"
+    lifecycle      = "sandbox"
+    contacts = [
+      {
+        type    = "email"
+        contact = var.alert_email != "" ? var.alert_email : "team-chatbot@example.com"
+      }
+    ]
+    links = [
+      {
+        name = "Source Code"
+        type = "repo"
+        url  = "https://github.com/Aziraphale81/datadog-chatbot-demo/tree/main/worker"
+      },
+      {
+        name = "Data Streams Monitoring"
+        type = "other"
+        url  = "https://app.${var.datadog_site}/data-streams"
+      }
+    ]
+    tags = [
+      "env:${var.environment}",
+      "managed_by:terraform",
+      "platform:kubernetes",
+      "messaging:rabbitmq",
+      "dsm:enabled",
+      "llm:true",
+      "language:python"
+    ]
+  })
+}
+
+# Service Entity - Apache Airflow
+resource "datadog_service_definition_yaml" "airflow" {
+  service_definition = yamlencode({
+    schema-version = "v2.2"
+    dd-service     = "chat-airflow"
+    team           = "team:chatbot"
+    application    = "chatbot-demo"
+    description    = "Apache Airflow orchestrating analytics jobs: daily summaries, token usage reports, and session cleanup"
+    tier           = "tier3"
+    lifecycle      = "sandbox"
+    contacts = [
+      {
+        type    = "email"
+        contact = var.alert_email != "" ? var.alert_email : "team-chatbot@example.com"
+      }
+    ]
+    links = [
+      {
+        name = "Airflow UI"
+        type = "url"
+        url  = "http://localhost:30808"
+      },
+      {
+        name = "Data Jobs Monitoring"
+        type = "other"
+        url  = "https://app.${var.datadog_site}/data-jobs"
+      },
+      {
+        name = "DAG Code"
+        type = "repo"
+        url  = "https://github.com/Aziraphale81/datadog-chatbot-demo/blob/main/k8s/airflow.yaml"
+      }
+    ]
+    tags = [
+      "env:${var.environment}",
+      "managed_by:terraform",
+      "platform:kubernetes",
+      "job_scheduler:airflow",
+      "djm:enabled"
+    ]
+  })
+}

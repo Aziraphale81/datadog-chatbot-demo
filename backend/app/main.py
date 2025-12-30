@@ -1,10 +1,15 @@
 import asyncio
+import json
 import logging
 import os
+import threading
+import time
 import uuid
 from typing import Optional
 
 from ddtrace import config, patch, tracer
+# DSM checkpoints: Automatic via DD_DATA_STREAMS_ENABLED
+# from ddtrace.data_streams import set_checkpoint
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,10 +18,9 @@ from pydantic import BaseModel
 from psycopg import Connection
 from psycopg_pool import ConnectionPool
 from datetime import datetime
-from typing import List
-
-# Enable common integrations
-patch(psycopg=True, logging=True)
+from typing import List, Dict
+# Enable common integrations (kombu auto-patched for DSM)
+patch(psycopg=True, logging=True, kombu=True)
 
 load_dotenv()
 
@@ -54,8 +58,23 @@ DUMMY_USER = {
     "email": os.getenv("DEMO_USER_EMAIL", "demo@example.com"),
 }
 
+# RabbitMQ Configuration
+RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', 'rabbitmq')
+RABBITMQ_PORT = int(os.getenv('RABBITMQ_PORT', '5672'))
+RABBITMQ_USER = os.getenv('RABBITMQ_USER', 'guest')
+RABBITMQ_PASS = os.getenv('RABBITMQ_PASS', 'guest')
+REQUEST_QUEUE = os.getenv('REQUEST_QUEUE', 'chat_requests')
+RESPONSE_QUEUE = os.getenv('RESPONSE_QUEUE', 'chat_responses')
+
 client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 pool: Optional[ConnectionPool] = None
+
+# Import Kombu-based messaging client
+from app.messaging import RabbitMQClient
+rabbitmq_client: Optional[RabbitMQClient] = None
+
+# In-memory cache for responses (in production, use Redis)
+response_cache: Dict[str, dict] = {}
 
 app = FastAPI(title="Chatbot Backend", version=DD_VERSION)
 app.add_middleware(
@@ -233,11 +252,76 @@ async def init_db() -> None:
     logger.info("Database ready", extra={"dsn": POSTGRES_DSN})
 
 
+def init_rabbitmq() -> None:
+    """Initialize RabbitMQ connection using Kombu (for DSM support)"""
+    global rabbitmq_client
+    
+    max_retries = 5
+    retry_delay = 5
+    
+    for attempt in range(max_retries):
+        try:
+            rabbitmq_client = RabbitMQClient(
+                host=RABBITMQ_HOST,
+                port=RABBITMQ_PORT,
+                user=RABBITMQ_USER,
+                password=RABBITMQ_PASS
+            )
+            rabbitmq_client.connect()
+            logger.info(f"Connected to RabbitMQ via Kombu at {RABBITMQ_HOST}:{RABBITMQ_PORT}")
+            return
+        except Exception as e:
+            logger.warning(f"RabbitMQ connection attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+            else:
+                logger.error("Failed to connect to RabbitMQ after all retries")
+                raise
+
+
+def consume_responses():
+    """Background thread to consume response messages from RabbitMQ using Kombu"""
+    def handle_response(response_data: dict):
+        """Process response message (DSM auto-instrumented by Kombu)"""
+        try:
+            request_id = response_data.get('request_id')
+            
+            # Store response in cache
+            response_cache[request_id] = response_data
+            logger.info(f"Cached response for request {request_id}")
+        except Exception as e:
+            logger.error(f"Error processing response: {e}", exc_info=True)
+    
+    try:
+        # Create separate client for consumer (separate connection)
+        consumer_client = RabbitMQClient(
+            host=RABBITMQ_HOST,
+            port=RABBITMQ_PORT,
+            user=RABBITMQ_USER,
+            password=RABBITMQ_PASS
+        )
+        consumer_client.connect()
+        logger.info("Starting background response consumer...")
+        
+        # This will block and consume messages
+        consumer_client.consume(RESPONSE_QUEUE, handle_response)
+    except Exception as e:
+        logger.error(f"Response consumer error: {e}", exc_info=True)
+
+
 @app.on_event("startup")
 async def on_startup() -> None:
     if not OPENAI_API_KEY:
         logger.warning("OPENAI_API_KEY not set; OpenAI calls will fail")
     await init_db()
+    
+    # Initialize RabbitMQ
+    await asyncio.to_thread(init_rabbitmq)
+    
+    # Start background consumer thread
+    consumer_thread = threading.Thread(target=consume_responses, daemon=True)
+    consumer_thread.start()
+    logger.info("Background response consumer thread started")
 
 
 @app.get("/health")
@@ -298,10 +382,10 @@ def _insert_message_blocking(
 
 async def call_openai(prompt: str) -> str:
     # Use Chat Completions API for broad compatibility across openai client versions
+    # Note: gpt-5-nano doesn't accept max_completion_tokens parameter
     response = await client.chat.completions.create(
         model=OPENAI_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        max_completion_tokens=1000,  # GPT-5+ uses max_completion_tokens instead of max_tokens
+        messages=[{"role": "user", "content": prompt}]
     )
     try:
         message = response.choices[0].message.content  # type: ignore[assignment]
@@ -313,6 +397,7 @@ async def call_openai(prompt: str) -> str:
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest) -> ChatResponse:
+    """Submit a chat request to RabbitMQ queue and wait for worker response"""
     if not req.prompt or not req.prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt is required")
 
@@ -335,23 +420,77 @@ async def chat(req: ChatRequest) -> ChatResponse:
         span.set_tag("chat.user_email", user["email"])
         span.set_tag("chat.session_id", session_id)
 
-    try:
-        reply = await call_openai(req.prompt)
-    except Exception as exc:
-        logger.exception("OpenAI call failed")
-        raise HTTPException(status_code=500, detail="LLM request failed") from exc
+    request_id = str(uuid.uuid4())
+    span.set_tag("chat.request_id", request_id)
 
-    no_answer = "i'm not sure" in reply.lower() or "cannot help" in reply.lower()
-    message_id = str(uuid.uuid4())
+    # Get conversation history for context
+    # TEMPORARILY DISABLED - gpt-5-nano has limited context window
+    conversation_history = []
+    # try:
+    #     messages = await get_session_messages(session_id)
+    #     # Convert to OpenAI message format (last 2 messages for context)
+    #     # Skip messages with empty replies to avoid confusing the model
+    #     valid_messages = [msg for msg in messages if msg.reply and msg.reply.strip()]
+    #     for msg in valid_messages[-2:]:
+    #         conversation_history.append({"role": "user", "content": msg.prompt})
+    #         conversation_history.append({"role": "assistant", "content": msg.reply})
+    # except Exception as e:
+    #     logger.warning(f"Could not fetch conversation history: {e}")
 
-    await insert_message(message_id, session_id, req.prompt, reply, no_answer, user)
+    # Publish message to RabbitMQ request queue (DSM auto-instrumented by Kombu)
+    message_data = {
+        "request_id": request_id,
+        "session_id": session_id,
+        "prompt": req.prompt,
+        "conversation_history": conversation_history,
+        "user": user
+    }
+
+    def _publish():
+        rabbitmq_client.publish(REQUEST_QUEUE, message_data)
+
+    await asyncio.to_thread(_publish)
 
     logger.info(
-        "Handled chat request",
-        extra={"user_id": user["id"], "no_answer": no_answer, "message_id": message_id, "session_id": session_id},
+        "Published chat request to queue, waiting for worker response",
+        extra={"user_id": user["id"], "request_id": request_id, "session_id": session_id},
     )
 
-    return ChatResponse(reply=reply, message_id=message_id, session_id=session_id, no_answer=no_answer)
+    # Wait for response from background consumer (up to 60 seconds)
+    max_wait_seconds = 60
+    poll_interval = 0.5  # Check every 500ms
+    elapsed = 0
+    
+    while elapsed < max_wait_seconds:
+        if request_id in response_cache:
+            # Got the response!
+            response_data = response_cache.pop(request_id)
+            
+            # Save to database
+            message_id = str(uuid.uuid4())
+            reply = response_data['response']
+            no_answer = "i'm not sure" in reply.lower() or "cannot help" in reply.lower()
+            
+            await insert_message(message_id, session_id, req.prompt, reply, no_answer, user)
+            
+            logger.info(
+                "Handled chat request via async queue",
+                extra={"user_id": user["id"], "request_id": request_id, "message_id": message_id, "wait_time": elapsed},
+            )
+            
+            return ChatResponse(
+                reply=reply,
+                message_id=message_id,
+                session_id=session_id,
+                no_answer=no_answer
+            )
+        
+        await asyncio.sleep(poll_interval)
+        elapsed += poll_interval
+    
+    # Timeout - worker didn't respond in time
+    logger.error(f"Timeout waiting for worker response: {request_id}")
+    raise HTTPException(status_code=504, detail="Worker timeout - please try again")
 
 
 # ===== Session Management Endpoints =====

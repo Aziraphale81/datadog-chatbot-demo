@@ -36,6 +36,9 @@ spec:
     metadata:
       labels:
         app: postgres
+        tags.datadoghq.com/service: chat-postgres
+        tags.datadoghq.com/env: demo
+        tags.datadoghq.com/version: "1.0.0"
       annotations:
         ad.datadoghq.com/postgres.check_names: '["postgres"]'
         ad.datadoghq.com/postgres.init_configs: '[{}]'
@@ -65,7 +68,7 @@ spec:
             - name: DD_SERVICE
               value: "chat-postgres"
             - name: DD_ENV
-              value: "dev"
+              value: "demo"
             - name: DD_VERSION
               value: "1.0.0"
             - name: POSTGRES_PASSWORD
