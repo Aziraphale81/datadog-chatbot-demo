@@ -160,3 +160,5 @@ echo ""
 echo "💡 Wait 1-2 minutes, then run: cd terraform && terraform apply -auto-approve"
 echo ""
 
+
+

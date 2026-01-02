@@ -31,29 +31,12 @@ echo "Verifying Kubernetes cluster..."
 kubectl cluster-info >/dev/null 2>&1 || { echo "Cannot reach Kubernetes cluster. Is Docker Desktop Kubernetes enabled?" >&2; exit 1; }
 
 echo ""
-echo "Step 1: Building Docker images..."
+echo "Step 1: Building Docker images (backend & worker)..."
 echo "Building backend..."
 docker build -t chat-backend:latest ./backend
 
 echo "Building worker..."
 docker build -t chat-worker:latest ./worker
-
-echo "Building frontend..."
-# Get RUM credentials from secrets if they exist, otherwise prompt
-if kubectl get secret datadog-keys -n chat-demo >/dev/null 2>&1; then
-    DD_RUM_CLIENT_TOKEN=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.rum-client-token}' 2>/dev/null | base64 -d || echo "")
-    DD_RUM_APP_ID=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.rum-app-id}' 2>/dev/null | base64 -d || echo "")
-fi
-
-docker build -t chat-frontend:latest \
-  ${DD_RUM_CLIENT_TOKEN:+--build-arg NEXT_PUBLIC_DD_CLIENT_TOKEN=$DD_RUM_CLIENT_TOKEN} \
-  ${DD_RUM_APP_ID:+--build-arg NEXT_PUBLIC_DD_APP_ID=$DD_RUM_APP_ID} \
-  --build-arg NEXT_PUBLIC_DD_SITE=datadoghq.com \
-  --build-arg NEXT_PUBLIC_DD_SERVICE=chat-frontend \
-  --build-arg NEXT_PUBLIC_DD_ENV=demo \
-  --build-arg NEXT_PUBLIC_DD_VERSION=1.0.0 \
-  --build-arg BACKEND_INTERNAL_BASE=http://backend.chat-demo.svc.cluster.local:8000 \
-  ./frontend
 
 echo ""
 echo "Step 2: Cleaning up any previous Datadog installations..."
@@ -131,7 +114,29 @@ else
 fi
 
 echo ""
+echo "Step 4.5: Building frontend with RUM credentials..."
+# Get RUM credentials from the secret we just created
+DD_RUM_CLIENT_TOKEN=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.rum-client-token}' 2>/dev/null | base64 -d || echo "")
+DD_RUM_APP_ID=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.rum-app-id}' 2>/dev/null | base64 -d || echo "")
+
+if [ -z "$DD_RUM_CLIENT_TOKEN" ] || [ -z "$DD_RUM_APP_ID" ]; then
+    echo "⚠️  Warning: RUM credentials not found. Frontend will build without RUM."
+fi
+
+echo "Building frontend with RUM integration..."
+docker build -t chat-frontend:latest \
+  ${DD_RUM_CLIENT_TOKEN:+--build-arg NEXT_PUBLIC_DD_CLIENT_TOKEN=$DD_RUM_CLIENT_TOKEN} \
+  ${DD_RUM_APP_ID:+--build-arg NEXT_PUBLIC_DD_APP_ID=$DD_RUM_APP_ID} \
+  --build-arg NEXT_PUBLIC_DD_SITE=datadoghq.com \
+  --build-arg NEXT_PUBLIC_DD_SERVICE=chat-frontend \
+  --build-arg NEXT_PUBLIC_DD_ENV=demo \
+  --build-arg NEXT_PUBLIC_DD_VERSION=1.0.0 \
+  --build-arg BACKEND_INTERNAL_BASE=http://backend.chat-demo.svc.cluster.local:8000 \
+  ./frontend
+
+echo ""
 echo "Step 5: Deploying Kubernetes resources..."
+kubectl apply -f k8s/chaos-rbac.yaml
 kubectl apply -f k8s/postgres.yaml
 kubectl apply -f k8s/rabbitmq.yaml
 kubectl apply -f k8s/airflow.yaml

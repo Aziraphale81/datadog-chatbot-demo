@@ -20,6 +20,88 @@ stringData:
   POSTGRES_PASSWORD: postgres
   POSTGRES_USER: postgres
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: chat-demo
+data:
+  init.sql: |
+    -- Postgres initialization script for Datadog DBM
+    -- This script enables required extensions and sets up the datadog monitoring user
+
+    -- Enable pg_stat_statements extension (required for DBM)
+    CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+
+    -- Create datadog monitoring user
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT FROM pg_catalog.pg_user WHERE usename = 'datadog') THEN
+        CREATE USER datadog WITH PASSWORD 'datadog_password';
+      END IF;
+    END
+    $$;
+
+    -- Grant necessary permissions for DBM
+    GRANT pg_monitor TO datadog;
+    GRANT SELECT ON pg_stat_database TO datadog;
+
+    -- Allow datadog user to connect to all databases
+    GRANT CONNECT ON DATABASE postgres TO datadog;
+
+    -- Create datadog schema for DBM functions
+    CREATE SCHEMA IF NOT EXISTS datadog;
+    GRANT USAGE ON SCHEMA datadog TO datadog;
+
+    -- Create explain_statement function for query plan analysis
+    CREATE OR REPLACE FUNCTION datadog.explain_statement(query text, OUT explain text)
+    RETURNS SETOF text AS $$
+    BEGIN
+      RETURN QUERY EXECUTE 'EXPLAIN (VERBOSE, FORMAT JSON) ' || query;
+    END;
+    $$ LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, pg_temp;
+
+    -- Grant execute permission to datadog user
+    GRANT EXECUTE ON FUNCTION datadog.explain_statement(text) TO datadog;
+
+    -- Create function to grant read-only access on existing tables
+    CREATE OR REPLACE FUNCTION grant_dd_read_only()
+    RETURNS void AS $$
+    BEGIN
+      EXECUTE 'GRANT SELECT ON ALL TABLES IN SCHEMA public TO datadog';
+      EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO datadog';
+    END;
+    $$ LANGUAGE plpgsql;
+
+    -- Execute the function
+    SELECT grant_dd_read_only();
+  z-app-schema.sql: |
+    -- Chatbot application schema
+    -- Creates tables for the chat application
+    
+    CREATE TABLE IF NOT EXISTS sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE TABLE IF NOT EXISTS chat_messages (
+        id UUID PRIMARY KEY,
+        session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        user_id TEXT,
+        user_name TEXT,
+        user_email TEXT,
+        prompt TEXT NOT NULL,
+        reply TEXT,
+        no_answer BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id);
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at);
+    CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at);
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -54,6 +136,20 @@ spec:
               "dbm": true
             }
           ]
+        ad.datadoghq.com/postgres.logs: |
+          [
+            {
+              "source": "postgresql",
+              "service": "chat-postgres",
+              "log_processing_rules": [
+                {
+                  "type": "multi_line",
+                  "name": "postgres_multiline",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}|^[A-Z]+:|^\\t"
+                }
+              ]
+            }
+          ]
     spec:
       containers:
         - name: postgres
@@ -86,10 +182,16 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: postgres-pvc
+        - name: init-script
+          configMap:
+            name: postgres-init
 ---
 apiVersion: v1
 kind: Service

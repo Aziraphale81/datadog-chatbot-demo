@@ -29,8 +29,9 @@ resource "helm_release" "datadog_agent" {
         }
         
         logs = {
-          enabled            = true
-          containerCollectAll = true
+          enabled                     = true
+          containerCollectAll         = true
+          containerCollectUsingFiles  = false
         }
         
         processAgent = {
@@ -50,13 +51,24 @@ resource "helm_release" "datadog_agent" {
           enabled = true
         }
         
+        # Network Performance Monitoring (NPM) - replaces systemProbe.enabled
+        networkMonitoring = {
+          enabled = true
+        }
+        
+        # System Probe granular features
+        systemProbe = {
+          enableTCPQueueLength = true
+          enableOOMKill        = true
+        }
+        
         # Cloud Security Management (CSM)
         securityAgent = {
           compliance = {
             enabled = true
           }
           runtime = {
-            enabled = true
+            enabled = true  # This enables CWS runtime detection
           }
         }
         
@@ -73,6 +85,18 @@ resource "helm_release" "datadog_agent" {
       agents = {
         useHostNetwork = true
         containers = {
+          agent = {
+            env = [
+              {
+                name  = "DD_LOGS_CONFIG_PROCESSING_RULES"
+                value = "[{\"type\":\"exclude_at_match\",\"name\":\"exclude_cgroup_errors\",\"pattern\":\"failed to compute cgroup path\"},{\"type\":\"exclude_at_match\",\"name\":\"exclude_port_conflicts\",\"pattern\":\"already opened by another service\"},{\"type\":\"exclude_at_match\",\"name\":\"exclude_mvcc_compaction\",\"pattern\":\"mvcc: required revision has been compacted\"}]"
+              },
+              {
+                name  = "DD_AC_EXCLUDE"
+                value = "name:etcd"
+              }
+            ]
+          }
           systemProbe = {
             securityContext = {
               capabilities = {

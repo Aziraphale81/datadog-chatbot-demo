@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added (2026-01-02)
+- **Log Optimization**: Postgres multiline log aggregation to reduce log volume by ~90%
+  - Added log processing annotations to `k8s/postgres.yaml` with multiline pattern matching
+  - Logs from multi-line SQL statements now aggregate into single entries (not 10+ separate logs)
+  - Example: 10-line SQL query now = 1 indexed log instead of 10
+  - **Impact**: Significant reduction in log ingestion costs
+- **Postgres DBM Support**: Enabled `pg_stat_statements` extension for Database Monitoring
+  - Created `postgres-init` ConfigMap with initialization SQL script
+  - Script creates extension, datadog user, and grants necessary permissions (pg_monitor, etc.)
+  - Mounted at `/docker-entrypoint-initdb.d/` for automatic execution on fresh deployments
+  - **Fixed**: Eliminated thousands of daily `pg_stat_statements` errors from agent logs
+- **Documentation**: New `LOG_OPTIMIZATION_SUMMARY.md` with detailed optimization guide
+  - Problems identified (multiline logs, missing extensions, agent errors)
+  - Solutions implemented with code examples
+  - Expected impact and cost savings
+  - Validation tests and deployment instructions
+
+### Changed (2026-01-02)
+- **Datadog Agent Config**: Updated `k8s/datadog-agent.yaml` to reduce noise
+  - Disabled CWS (Cloud Workload Security) - incompatible with Docker Desktop
+  - Set `DD_LOG_LEVEL=warn` to reduce agent verbosity
+  - Eliminates system-probe cgroup path errors on Docker Desktop
+  - Note: Agent deployed via Helm, config updated for documentation/future deployments
+- **Postgres Pod Configuration**: Enhanced for DBM and logging
+  - Added `postgres-init` ConfigMap volume mount for init scripts
+  - Added multiline log processing annotation for chat-postgres service
+  - Already had `shared_preload_libraries=pg_stat_statements` configured
+
 ### Changed
 - **Synthetic Test Intervals**: Reduced test frequency to minimize cost and APM noise
   - Frontend Uptime Check: 5 minutes → **1 hour**

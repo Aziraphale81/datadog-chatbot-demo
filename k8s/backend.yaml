@@ -22,13 +22,21 @@ spec:
           [{
             "source": "python",
             "service": "chat-backend",
-            "log_processing_rules": [{
-              "type": "exclude_at_match",
-              "name": "exclude_health_checks",
-              "pattern": "GET /health"
-            }]
+            "log_processing_rules": [
+              {
+                "type": "multi_line",
+                "name": "aggregate_python_tracebacks",
+                "pattern": "(Traceback|.*Exception:|ERROR)"
+              },
+              {
+                "type": "exclude_at_match",
+                "name": "exclude_health_checks",
+                "pattern": "GET /health"
+              }
+            ]
           }]
     spec:
+      serviceAccountName: chaos-controller
       containers:
         - name: backend
           image: chat-backend:latest

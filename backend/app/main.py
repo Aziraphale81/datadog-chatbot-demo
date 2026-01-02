@@ -676,3 +676,39 @@ async def delete_session(session_id: str) -> dict:
     return {"deleted": session_id}
 
 
+# ============================================================================
+# CHAOS ENGINEERING ENDPOINTS (for demo purposes)
+# ============================================================================
+
+from .chaos import (
+    get_chaos_status,
+    toggle_traffic,
+    trigger_scenario
+)
+
+class TrafficRequest(BaseModel):
+    enabled: bool
+    level: str = "light"
+
+class ScenarioRequest(BaseModel):
+    scenario: str
+
+
+@app.get("/chaos/status")
+async def chaos_status() -> dict:
+    """Get current chaos control panel status"""
+    return await get_chaos_status()
+
+
+@app.post("/chaos/traffic")
+async def chaos_traffic(request: TrafficRequest) -> dict:
+    """Enable/disable traffic generation"""
+    return toggle_traffic(request.enabled, request.level)
+
+
+@app.post("/chaos/scenario")
+async def chaos_scenario(request: ScenarioRequest) -> dict:
+    """Trigger a break-fix scenario"""
+    return await trigger_scenario(request.scenario)
+
+

@@ -19,6 +19,17 @@ spec:
       enabled: true
     logCollection:
       enabled: true
+      containerCollectAll: false
+      containerCollectUsingFiles: true
     orchestratorExplorer:
       enabled: true
+    # Disable CWS (Cloud Workload Security) to avoid cgroup errors on Docker Desktop
+    cws:
+      enabled: false
+  override:
+    nodeAgent:
+      env:
+        # Filter system-probe cgroup errors from logs
+        - name: DD_LOG_LEVEL
+          value: "warn"
 

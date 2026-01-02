@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import Sidebar from "../components/Sidebar";
+import ChaosPanel from "../components/ChaosPanel";
 
 export default function Home() {
   // Session management
@@ -8,6 +9,7 @@ export default function Home() {
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [chaosPanelOpen, setChaosPanelOpen] = useState(false);
   
   // Chat state
   const [prompt, setPrompt] = useState("");
@@ -191,6 +193,12 @@ export default function Home() {
         onDeleteSession={handleDeleteSession}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
+        onChaosToggle={() => setChaosPanelOpen(!chaosPanelOpen)}
+      />
+      
+      <ChaosPanel
+        isOpen={chaosPanelOpen}
+        onClose={() => setChaosPanelOpen(false)}
       />
       
       <main className="main-content">

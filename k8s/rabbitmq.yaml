@@ -47,7 +47,11 @@ spec:
             {
               "rabbitmq_api_url": "http://%%host%%:15672/api/",
               "username": "guest",
-              "password": "guest"
+              "password": "guest",
+              "queues": ["chat_requests", "chat_responses"],
+              "queues_regexes": ["chat_.*"],
+              "collect_queue_metrics": true,
+              "tag_families": true
             }
           ]
         ad.datadoghq.com/rabbitmq.logs: '[{"source":"rabbitmq","service":"chat-rabbitmq"}]'

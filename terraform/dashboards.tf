@@ -496,6 +496,26 @@ resource "datadog_dashboard_json" "chatbot_overview" {
                 }]
               }
               layout = { x = 4, y = 2, width = 4, height = 2 }
+            },
+            {
+              id = 8379443870741391
+              definition = {
+                title       = "Backend Memory Usage"
+                show_legend = false
+                type        = "timeseries"
+                requests = [{
+                  on_right_yaxis  = false
+                  queries = [{ 
+                    data_source = "metrics", 
+                    name = "memory", 
+                    query = "avg:container.memory.usage{kube_namespace:chat-demo,kube_deployment:backend}" 
+                  }]
+                  response_format = "timeseries"
+                  style = { palette = "blue" }
+                  display_type = "area"
+                }]
+              }
+              layout = { x = 8, y = 2, width = 4, height = 2 }
             }
           ]
         }
@@ -593,14 +613,14 @@ resource "datadog_dashboard_json" "chatbot_overview" {
                 requests = [
                   {
                     on_right_yaxis  = false
-                    queries = [{ data_source = "metrics", name = "publish_rate", query = "sum:rabbitmq.queue.messages.publish.count{service:chat-rabbitmq,env:demo} by {queue}.as_rate()" }]
+                    queries = [{ data_source = "metrics", name = "publish_rate", query = "sum:rabbitmq.queue.messages.publish.rate{service:chat-rabbitmq,env:demo} by {queue}" }]
                     response_format = "timeseries"
                     style = { palette = "green" }
                     display_type = "line"
                   },
                   {
                     on_right_yaxis  = false
-                    queries = [{ data_source = "metrics", name = "consume_rate", query = "sum:rabbitmq.queue.messages.deliver.count{service:chat-rabbitmq,env:demo} by {queue}.as_rate()" }]
+                    queries = [{ data_source = "metrics", name = "consume_rate", query = "sum:rabbitmq.queue.messages.deliver.rate{service:chat-rabbitmq,env:demo} by {queue}" }]
                     response_format = "timeseries"
                     style = { palette = "blue" }
                     display_type = "line"

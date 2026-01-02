@@ -1,0 +1,47 @@
+---
+# ServiceAccount for backend to access K8s API (chaos engineering)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chaos-controller
+  namespace: chat-demo
+---
+# Role with permissions to manage deployments for chaos scenarios
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chaos-controller
+  namespace: chat-demo
+rules:
+  # Read deployment status
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+  # Scale deployments
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["get", "update", "patch"]
+  # Update deployment specs (for env vars, resource limits, restarts)
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["patch", "update"]
+  # Read pod status
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+# Bind the role to the service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chaos-controller
+  namespace: chat-demo
+subjects:
+  - kind: ServiceAccount
+    name: chaos-controller
+    namespace: chat-demo
+roleRef:
+  kind: Role
+  name: chaos-controller
+  apiGroup: rbac.authorization.k8s.io
+

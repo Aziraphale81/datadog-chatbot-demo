@@ -12,3 +12,5 @@ COPY app/ ./app/
 # Run with ddtrace
 CMD ["ddtrace-run", "python", "-m", "app.main"]
 
+
+

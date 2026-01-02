@@ -161,11 +161,11 @@ resource "datadog_monitor" "postgres_slow_queries" {
     ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
   EOT
 
-  query = "avg(last_10m):postgresql.queries.time{kube_cluster_name:${var.cluster_name},kube_namespace:${var.namespace}} > 500"
+  query = "avg(last_10m):postgresql.queries.time{kube_namespace:${var.namespace}} > 50000000"
 
   monitor_thresholds {
-    critical = 500
-    warning  = 200
+    critical = 50000000  # 50ms in nanoseconds
+    warning  = 10000000  # 10ms in nanoseconds
   }
 
   notify_no_data    = false
@@ -189,17 +189,17 @@ resource "datadog_monitor" "pod_restarts" {
   message = <<-EOT
     Pods in ${var.namespace} are restarting frequently.
     
-    Check Kubernetes Events and pod logs.
+    Check Kubernetes Events and pod logs for OOMKills or CrashLoopBackOff.
     
     ${var.alert_email != "" ? "@${var.alert_email}" : ""}
     ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
   EOT
 
-  query = "change(sum(last_5m),last_5m):kubernetes.containers.restarts{kube_namespace:${var.namespace}} > 3"
+  query = "change(sum(last_2m),last_2m):kubernetes.containers.restarts{kube_namespace:${var.namespace}} > 2"
 
   monitor_thresholds {
-    critical = 3
-    warning  = 1
+    critical = 2  # 2+ restarts in 2 minutes = critical issue
+    warning  = 1  # 1 restart in 2 minutes = investigate
   }
 
   notify_no_data    = false
@@ -404,7 +404,7 @@ resource "datadog_monitor" "openai_api_errors" {
     ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
   EOT
 
-  query = "sum(last_5m):sum:trace.openai.request.error{env:${var.environment}} > 5"
+  query = "sum(last_5m):sum:trace.openai.request.errors{env:${var.environment}} > 5"
 
   monitor_thresholds {
     critical = 5

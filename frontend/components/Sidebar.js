@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import styles from '../styles/Sidebar.module.css';
 
 export default function Sidebar({ 
@@ -8,9 +8,12 @@ export default function Sidebar({
   onNewChat, 
   onDeleteSession,
   isOpen,
-  onToggle 
+  onToggle,
+  onChaosToggle
 }) {
   const [deletingId, setDeletingId] = useState(null);
+  const clickCountRef = useRef(0);
+  const clickTimeoutRef = useRef(null);
 
   const handleDelete = async (sessionId, e) => {
     e.stopPropagation();
@@ -33,6 +36,28 @@ export default function Sidebar({
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
     return date.toLocaleDateString();
+  };
+
+  const handleBrandingClick = () => {
+    clickCountRef.current += 1;
+    
+    // Clear any existing timeout
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+    }
+    
+    // Triple-click detected!
+    if (clickCountRef.current === 3) {
+      clickCountRef.current = 0;
+      if (onChaosToggle) {
+        onChaosToggle();
+      }
+    } else {
+      // Reset counter after 1 second
+      clickTimeoutRef.current = setTimeout(() => {
+        clickCountRef.current = 0;
+      }, 1000);
+    }
   };
 
   return (
@@ -94,7 +119,11 @@ export default function Sidebar({
         </div>
 
         <div className={styles.footer}>
-          <div className={styles.branding}>
+          <div 
+            className={styles.branding}
+            onClick={handleBrandingClick}
+            title="Triple-click for easter egg..."
+          >
             Datadog Chatbot Demo
           </div>
         </div>
