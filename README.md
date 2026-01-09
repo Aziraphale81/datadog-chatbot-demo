@@ -6,6 +6,8 @@ All Datadog resources (monitors, SLOs, dashboards, synthetics, security rules, S
 
 <img width="800" alt="image" src="https://github.com/user-attachments/assets/1dd5cc07-409f-4f06-a88b-43010b8a8123" />
 
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/5811a9af-d1ca-4637-8520-53dbc9ba7d31" />
+
 ## Quick Start (Automated)
 
 ```bash
