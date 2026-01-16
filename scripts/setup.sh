@@ -6,6 +6,16 @@ echo "AI Chatbot + Datadog Demo Setup"
 echo "================================================"
 echo ""
 
+# Extract version from git commit SHA (7 chars)
+if git rev-parse --git-dir > /dev/null 2>&1; then
+    VERSION=$(git rev-parse --short=7 HEAD 2>/dev/null || echo "dev")
+    echo "📌 Version (git SHA): $VERSION"
+else
+    VERSION="dev"
+    echo "⚠️  Not a git repository, using version: $VERSION"
+fi
+echo ""
+
 # Check prerequisites
 echo "Checking prerequisites..."
 command -v kubectl >/dev/null 2>&1 || { echo "kubectl is required but not installed. Aborting." >&2; exit 1; }
@@ -32,11 +42,11 @@ kubectl cluster-info >/dev/null 2>&1 || { echo "Cannot reach Kubernetes cluster.
 
 echo ""
 echo "Step 1: Building Docker images (backend & worker)..."
-echo "Building backend..."
-docker build -t chat-backend:latest ./backend
+echo "Building backend with version: $VERSION"
+docker build -t chat-backend:latest --build-arg VERSION=$VERSION ./backend
 
-echo "Building worker..."
-docker build -t chat-worker:latest ./worker
+echo "Building worker with version: $VERSION"
+docker build -t chat-worker:latest --build-arg VERSION=$VERSION ./worker
 
 echo ""
 echo "Step 2: Cleaning up any previous Datadog installations..."
@@ -123,26 +133,46 @@ if [ -z "$DD_RUM_CLIENT_TOKEN" ] || [ -z "$DD_RUM_APP_ID" ]; then
     echo "⚠️  Warning: RUM credentials not found. Frontend will build without RUM."
 fi
 
-echo "Building frontend with RUM integration..."
+echo "Building frontend with RUM integration and version: $VERSION"
 docker build -t chat-frontend:latest \
   ${DD_RUM_CLIENT_TOKEN:+--build-arg NEXT_PUBLIC_DD_CLIENT_TOKEN=$DD_RUM_CLIENT_TOKEN} \
   ${DD_RUM_APP_ID:+--build-arg NEXT_PUBLIC_DD_APP_ID=$DD_RUM_APP_ID} \
   --build-arg NEXT_PUBLIC_DD_SITE=datadoghq.com \
   --build-arg NEXT_PUBLIC_DD_SERVICE=chat-frontend \
   --build-arg NEXT_PUBLIC_DD_ENV=demo \
-  --build-arg NEXT_PUBLIC_DD_VERSION=1.0.0 \
+  --build-arg NEXT_PUBLIC_DD_VERSION=$VERSION \
   --build-arg BACKEND_INTERNAL_BASE=http://backend.chat-demo.svc.cluster.local:8000 \
   ./frontend
 
 echo ""
-echo "Step 5: Deploying Kubernetes resources..."
+echo "Step 5: Deploying Kubernetes resources with version: $VERSION"
+
+# Deploy resources that don't need version injection
 kubectl apply -f k8s/chaos-rbac.yaml
 kubectl apply -f k8s/postgres.yaml
 kubectl apply -f k8s/rabbitmq.yaml
 kubectl apply -f k8s/airflow.yaml
-kubectl apply -f k8s/backend.yaml
-kubectl apply -f k8s/worker.yaml
-kubectl apply -f k8s/frontend.yaml
+
+# For backend, worker, and frontend: inject VERSION dynamically
+echo "Injecting version $VERSION into deployments..."
+
+# Backend
+cat k8s/backend.yaml | \
+  sed "s|tags.datadoghq.com/version: \"1.0.0\"|tags.datadoghq.com/version: \"$VERSION\"|g" | \
+  sed "s|DD_VERSION[[:space:]]*$|DD_VERSION|g" | \
+  sed "s|value: \"1.0.0\"|value: \"$VERSION\"|g" | \
+  kubectl apply -f -
+
+# Worker
+cat k8s/worker.yaml | \
+  sed "s|value: \"1.0.0\"|value: \"$VERSION\"|g" | \
+  kubectl apply -f -
+
+# Frontend
+cat k8s/frontend.yaml | \
+  sed "s|tags.datadoghq.com/version: \"1.0.0\"|tags.datadoghq.com/version: \"$VERSION\"|g" | \
+  sed "s|value: \"1.0.0\"|value: \"$VERSION\"|g" | \
+  kubectl apply -f -
 
 echo ""
 echo "Step 6: Deploying Datadog resources via Terraform..."

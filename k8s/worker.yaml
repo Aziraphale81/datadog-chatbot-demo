@@ -18,6 +18,7 @@ spec:
         app: chat-worker
         tags.datadoghq.com/service: chat-worker
         tags.datadoghq.com/env: demo
+        tags.datadoghq.com/version: "1.0.0"
         team: chatbot
         admission.datadoghq.com/enabled: "true"
       annotations:

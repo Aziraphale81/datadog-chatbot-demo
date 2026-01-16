@@ -227,3 +227,10 @@ export default function ChaosPanel({ isOpen, onClose }) {
   );
 }
 
+
+
+
+
+
+
+

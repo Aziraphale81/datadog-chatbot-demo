@@ -5,7 +5,7 @@ resource "datadog_monitor" "backend_latency_p95" {
   name    = "[${var.environment}] Backend API Latency (p95) is high"
   type    = "metric alert"
   message = <<-EOT
-    The p95 latency for ${var.backend_service} has exceeded 5 seconds.
+    The p95 latency for ${var.backend_service} has exceeded 30 seconds.
     
     Note: This includes OpenAI API calls which can be slow.
     
@@ -19,11 +19,11 @@ resource "datadog_monitor" "backend_latency_p95" {
     ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
   EOT
 
-  query = "avg(last_5m):p95:trace.http.request{service:${var.backend_service},env:${var.environment}} > 5"
+  query = "avg(last_5m):p95:trace.http.request{service:${var.backend_service},env:${var.environment}} > 30"
 
   monitor_thresholds {
-    critical = 5.0  # 5 seconds (reasonable for OpenAI API calls)
-    warning  = 3.0  # 3 seconds
+    critical = 30.0  # 30 seconds (accommodates OpenAI p99 latency of 15-25s)
+    warning  = 20.0  # 20 seconds (accommodates OpenAI p95 latency)
   }
 
   notify_no_data    = false
@@ -273,11 +273,11 @@ resource "datadog_monitor" "rabbitmq_queue_depth" {
     ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
   EOT
 
-  query = "avg(last_5m):sum:rabbitmq.queue.messages{service:chat-rabbitmq,env:${var.environment}} > 100"
+  query = "avg(last_5m):sum:rabbitmq.queue.messages{service:chat-rabbitmq,env:${var.environment}} > 10"
 
   monitor_thresholds {
-    critical = 100
-    warning  = 50
+    critical = 10  # 10 messages = significant backlog (15x normal max of 0.65)
+    warning  = 5   # 5 messages = worker falling behind (8x normal)
   }
 
   notify_no_data    = false

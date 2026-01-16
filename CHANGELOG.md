@@ -4,6 +4,53 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added (2026-01-16)
+- **Dynamic Versioning**: Automatic git commit SHA versioning for deployment tracking
+  - `scripts/setup.sh` extracts 7-char git SHA and injects into all services
+  - Updated Dockerfiles (backend, worker, frontend) to accept `VERSION` build arg
+  - K8s manifests dynamically updated with version during deployment
+  - Enables Datadog deployment tracking, version comparison, and GitHub source code integration
+  - New `VERSIONING.md` documentation with complete implementation guide
+- **Datadog Notebook**: Terraform-managed notebook for monitor analysis
+  - New `terraform/notebook.tf` with pre-configured cells for threshold analysis
+  - Includes SQL queries, metrics visualization, and tuning recommendations
+  - Automatically deployed with `terraform apply`
+- **Code Security**: Static Analysis configuration
+  - Added `static-analysis.datadog.yml` for SAST scanning
+  - Configures Python and JavaScript vulnerability detection
+  - Enables dependency scanning for requirements.txt and package.json
+- **Monitor Documentation**: Analysis and tuning guides
+  - `MONITOR_ANALYSIS_NOTEBOOK.md`: Detailed threshold analysis for all 15 monitors
+  - `APPLY_MONITOR_TUNING.md`: Implementation guide for recommended changes
+  - Includes baseline metrics, alert history, and tuning rationale
+
+### Fixed (2026-01-16)
+- **DJM (Data Jobs Monitoring)**: Corrected OpenLineage configuration for Airflow
+  - Changed transport type from `"http"` to `"datadog"` (per Datadog docs Option 1)
+  - Added required `DD_API_KEY` and `DD_SITE` environment variables
+  - Fixed namespace variable from `AIRFLOW__OPENLINEAGE__NAMESPACE` to `OPENLINEAGE_NAMESPACE`
+  - Simplified from composite transport to direct Datadog transport
+  - **Impact**: Airflow job runs now properly sent to Datadog DJM
+- **Chat Worker**: Scaled deployment from 0 to 1 replica
+  - Worker was inadvertently scaled down, causing all chat requests to timeout
+  - Restored to 1 replica, resolving 504 Gateway Timeout errors
+  - **Impact**: Chat functionality fully restored
+
+### Changed (2026-01-16)
+- **Backend API Latency Monitor**: Tuned thresholds for OpenAI integration
+  - Critical threshold: 5s → 30s
+  - Warning threshold: 3s → 20s
+  - **Rationale**: OpenAI API calls take 15-25s normally; previous thresholds caused false alerts
+  - **Impact**: Eliminated constant alerting during normal operations
+
+### Removed (2026-01-16)
+- **Obsolete Documentation**: Cleaned up temporary troubleshooting files
+  - Deleted `DJM_FIX_COMPOSITE_TRANSPORT.md` (issue now fixed in code)
+  - Deleted `FINAL_CLEANUP_SUMMARY.md` (outdated from Jan 2)
+  - **Impact**: Reduced documentation clutter, easier navigation
+
+---
+
 ### Added (2026-01-02)
 - **Log Optimization**: Postgres multiline log aggregation to reduce log volume by ~90%
   - Added log processing annotations to `k8s/postgres.yaml` with multiline pattern matching

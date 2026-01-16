@@ -136,23 +136,18 @@ spec:
               value: "GET /health"
             
             # OpenLineage Configuration for DJM (Data Jobs Monitoring)
-            # NOTE: Datadog requires "composite" transport type with nested structure
-            - name: OPENLINEAGE__TRANSPORT__TYPE
-              value: "composite"
-            - name: OPENLINEAGE__TRANSPORT__TRANSPORTS__DATADOG__TYPE
-              value: "http"
-            - name: OPENLINEAGE__TRANSPORT__TRANSPORTS__DATADOG__URL
-              value: "https://data-obs-intake.datadoghq.com"
-            - name: OPENLINEAGE__TRANSPORT__TRANSPORTS__DATADOG__AUTH__TYPE
-              value: "api_key"
-            - name: OPENLINEAGE__TRANSPORT__TRANSPORTS__DATADOG__AUTH__API_KEY
+            # Option 1: Datadog Transport (Recommended - simplest configuration)
+            # Requires apache-airflow-providers-openlineage >= 2.7.3 and openlineage-python >= 1.37.0
+            - name: DD_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: datadog-keys
                   key: api-key
-            - name: OPENLINEAGE__TRANSPORT__TRANSPORTS__DATADOG__COMPRESSION
-              value: "gzip"
-            - name: AIRFLOW__OPENLINEAGE__NAMESPACE
+            - name: DD_SITE
+              value: "datadoghq.com"
+            - name: OPENLINEAGE__TRANSPORT__TYPE
+              value: "datadog"
+            - name: OPENLINEAGE_NAMESPACE
               value: "demo"
             # Optional: Enable debug logging for OpenLineage
             - name: OPENLINEAGE_CLIENT_LOGGING

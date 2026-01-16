@@ -1,5 +1,9 @@
 FROM python:3.11-slim
 
+# Accept VERSION as build arg (git commit SHA)
+ARG VERSION=dev
+ENV DD_VERSION=$VERSION
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 

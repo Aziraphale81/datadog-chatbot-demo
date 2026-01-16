@@ -7,7 +7,7 @@ ARG NEXT_PUBLIC_DD_APP_ID
 ARG NEXT_PUBLIC_DD_SITE=datadoghq.com
 ARG NEXT_PUBLIC_DD_SERVICE=chat-frontend
 ARG NEXT_PUBLIC_DD_ENV=demo
-ARG NEXT_PUBLIC_DD_VERSION=1.0.0
+ARG NEXT_PUBLIC_DD_VERSION=dev
 ARG BACKEND_INTERNAL_BASE=http://backend.chat-demo.svc.cluster.local:8000
 
 # Set as env vars for the build

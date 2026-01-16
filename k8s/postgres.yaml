@@ -54,8 +54,9 @@ data:
     GRANT USAGE ON SCHEMA datadog TO datadog;
 
     -- Create explain_statement function for query plan analysis
-    CREATE OR REPLACE FUNCTION datadog.explain_statement(query text, OUT explain text)
-    RETURNS SETOF text AS $$
+    -- NOTE: MUST return json, not text, to match EXPLAIN FORMAT JSON output
+    CREATE OR REPLACE FUNCTION datadog.explain_statement(query text, OUT explain json)
+    RETURNS SETOF json AS $$
     BEGIN
       RETURN QUERY EXECUTE 'EXPLAIN (VERBOSE, FORMAT JSON) ' || query;
     END;

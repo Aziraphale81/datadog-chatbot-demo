@@ -231,3 +231,10 @@ curl http://localhost:30080/api/chaos/status | jq .
 
 **This demo showcases 80%+ of Datadog's platform in a real, working application!** 🚀
 
+
+
+
+
+
+
+

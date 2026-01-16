@@ -1,5 +1,9 @@
 FROM python:3.12-slim
 
+# Accept VERSION as build arg (git commit SHA)
+ARG VERSION=dev
+ENV DD_VERSION=$VERSION
+
 WORKDIR /app
 
 # Install dependencies
@@ -11,6 +15,13 @@ COPY app/ ./app/
 
 # Run with ddtrace
 CMD ["ddtrace-run", "python", "-m", "app.main"]
+
+
+
+
+
+
+
 
 
 

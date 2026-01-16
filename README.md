@@ -350,11 +350,20 @@ See [PRIVATE_LOCATION_SETUP.md](PRIVATE_LOCATION_SETUP.md) for 5-minute setup gu
 
 ### **Deployment Tracking**
 
-Correlate deployments with performance changes:
-1. Set `DD_VERSION` to git SHA or semantic version
-2. Use Deployment Tracking API to mark releases
-3. Create deployment markers on dashboards
-4. Set up deployment-triggered monitors
+✅ **Automatic Version Tracking**: This project uses **git commit SHA for `DD_VERSION`** automatically!
+
+Every deployment is tracked with the exact code version:
+- **Automatic**: Version extracted from `git rev-parse --short=7 HEAD` during setup
+- **Tagged**: All traces, logs, metrics, and RUM sessions include the version
+- **Traceable**: Direct links from Datadog traces to GitHub commits
+- **Comparable**: Compare performance/errors between versions
+
+See [VERSIONING.md](VERSIONING.md) for complete documentation.
+
+Additional deployment tracking:
+1. Deployment markers automatically appear in APM/metrics dashboards
+2. Use Deployment Tracking API for release notes and metadata
+3. Set up deployment-triggered monitors for regression detection
 
 ---
 
