@@ -125,16 +125,25 @@ fi
 
 echo ""
 echo "Step 4.5: Building frontend with RUM credentials..."
-# Get RUM credentials from the secret we just created
+# Get RUM credentials and API key from the secret we just created
 DD_RUM_CLIENT_TOKEN=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.rum-client-token}' 2>/dev/null | base64 -d || echo "")
 DD_RUM_APP_ID=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.rum-app-id}' 2>/dev/null | base64 -d || echo "")
+DD_API_KEY_FOR_BUILD=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.api-key}' 2>/dev/null | base64 -d || echo "")
 
 if [ -z "$DD_RUM_CLIENT_TOKEN" ] || [ -z "$DD_RUM_APP_ID" ]; then
     echo "⚠️  Warning: RUM credentials not found. Frontend will build without RUM."
 fi
+if [ -n "$DD_API_KEY_FOR_BUILD" ]; then
+    export DD_API_KEY="$DD_API_KEY_FOR_BUILD"
+    echo "Source map upload enabled (API key present). RUM Error Tracking will show unminified stack traces."
+else
+    echo "💡 Tip: To get unminified RUM errors, add api-key to the datadog-keys secret and rebuild the frontend."
+fi
 
 echo "Building frontend with RUM integration and version: $VERSION"
-docker build -t chat-frontend:latest \
+SOURCEMAP_SECRET_OPT=""
+[ -n "$DD_API_KEY_FOR_BUILD" ] && SOURCEMAP_SECRET_OPT="--secret id=DD_API_KEY,env=DD_API_KEY"
+DOCKER_BUILDKIT=1 docker build -t chat-frontend:latest \
   ${DD_RUM_CLIENT_TOKEN:+--build-arg NEXT_PUBLIC_DD_CLIENT_TOKEN=$DD_RUM_CLIENT_TOKEN} \
   ${DD_RUM_APP_ID:+--build-arg NEXT_PUBLIC_DD_APP_ID=$DD_RUM_APP_ID} \
   --build-arg NEXT_PUBLIC_DD_SITE=datadoghq.com \
@@ -142,6 +151,7 @@ docker build -t chat-frontend:latest \
   --build-arg NEXT_PUBLIC_DD_ENV=demo \
   --build-arg NEXT_PUBLIC_DD_VERSION=$VERSION \
   --build-arg BACKEND_INTERNAL_BASE=http://backend.chat-demo.svc.cluster.local:8000 \
+  $SOURCEMAP_SECRET_OPT \
   ./frontend
 
 echo ""

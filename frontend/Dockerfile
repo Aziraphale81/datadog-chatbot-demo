@@ -24,6 +24,22 @@ RUN npm install
 COPY . /app
 RUN npm run build
 
+# Upload RUM source maps to Datadog when DD_API_KEY is provided (BuildKit secret).
+# Secret is optional: no key => skip upload (no secrets leakage); with key => unminified Error Tracking.
+RUN --mount=type=secret,id=DD_API_KEY,required=false \
+  if [ -f /run/secrets/DD_API_KEY ]; then \
+    export DATADOG_API_KEY=$(cat /run/secrets/DD_API_KEY) && \
+    export DATADOG_SITE="${NEXT_PUBLIC_DD_SITE:-datadoghq.com}" && \
+    npx datadog-ci sourcemaps upload .next/static \
+      --service chat-frontend \
+      --minified-path-prefix /_next/static \
+      --release-version "${NEXT_PUBLIC_DD_VERSION:-dev}" \
+      --disable-git && \
+    echo "Source maps uploaded for version ${NEXT_PUBLIC_DD_VERSION:-dev}"; \
+  else \
+    echo "Skipping source map upload (DD_API_KEY not provided). RUM Error Tracking will show minified stack traces."; \
+  fi
+
 FROM node:20-alpine
 WORKDIR /app
 COPY --from=build /app ./

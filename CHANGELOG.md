@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **RUM source map upload (optional)**: Unminified stack traces in Error Tracking
+  - Frontend build uploads source maps to Datadog when `api-key` is in `datadog-keys` (BuildKit secret; key never stored in image)
+  - `productionBrowserSourceMaps: true` in Next.js; `@datadog/datadog-ci` devDependency; upload runs in Dockerfile build stage
+  - `scripts/setup.sh` passes API key as optional `--secret`; README manual build updated. No key => build succeeds, Error Tracking stays minified
+
 ### Added (2026-01-16)
 - **Dynamic Versioning**: Automatic git commit SHA versioning for deployment tracking
   - `scripts/setup.sh` extracts 7-char git SHA and injects into all services

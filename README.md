@@ -19,7 +19,7 @@ chmod +x scripts/setup.sh scripts/teardown.sh
 ```
 
 This script will:
-1. Build Docker images for backend, frontend, and worker
+1. Build Docker images for backend, frontend, and worker (frontend build optionally uploads RUM source maps when `api-key` is in `datadog-keys`—no secrets stored in images)
 2. Create Kubernetes namespace
 3. Prompt for secrets if not already created
 4. Deploy application stack (Postgres, RabbitMQ, backend, worker, frontend)
@@ -59,14 +59,21 @@ docker build -t chat-worker:latest ./worker
 export DD_RUM_CLIENT_TOKEN=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.rum-client-token}' | base64 -d)
 export DD_RUM_APP_ID=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.rum-app-id}' | base64 -d)
 
-docker build -t chat-frontend:latest \
+# Optional: upload RUM source maps so Error Tracking shows unminified stack traces (uses BuildKit secret; API key never stored in image)
+export DD_API_KEY=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.api-key}' | base64 -d)
+VERSION=$(git rev-parse --short=7 HEAD 2>/dev/null || echo "1.0.0")
+SOURCEMAP_SECRET_OPT=""
+[ -n "$DD_API_KEY" ] && SOURCEMAP_SECRET_OPT="--secret id=DD_API_KEY,env=DD_API_KEY"
+
+DOCKER_BUILDKIT=1 docker build -t chat-frontend:latest \
   --build-arg NEXT_PUBLIC_DD_CLIENT_TOKEN=$DD_RUM_CLIENT_TOKEN \
   --build-arg NEXT_PUBLIC_DD_APP_ID=$DD_RUM_APP_ID \
   --build-arg NEXT_PUBLIC_DD_SITE=datadoghq.com \
   --build-arg NEXT_PUBLIC_DD_SERVICE=chat-frontend \
   --build-arg NEXT_PUBLIC_DD_ENV=demo \
-  --build-arg NEXT_PUBLIC_DD_VERSION=1.0.0 \
+  --build-arg NEXT_PUBLIC_DD_VERSION=$VERSION \
   --build-arg BACKEND_INTERNAL_BASE=http://backend.chat-demo.svc.cluster.local:8000 \
+  $SOURCEMAP_SECRET_OPT \
   ./frontend
 ```
 
@@ -121,7 +128,7 @@ terraform -chdir=terraform output -raw dashboard_url
 ### Application Stack
 - **Backend**: FastAPI API service that publishes chat requests to RabbitMQ queue
 - **Worker**: Python async worker that consumes from queue, calls OpenAI, publishes responses
-- **Frontend**: Next.js with RUM + Session Replay, polls for async responses
+- **Frontend**: Next.js with RUM + Session Replay, polls for async responses. Optional RUM source map upload at build time (when `api-key` is in `datadog-keys`) so Error Tracking shows unminified stack traces; API key is passed as a BuildKit secret and never stored in the image.
 - **Message Broker**: RabbitMQ for async chat processing with DSM instrumentation
 - **Database**: Postgres with DBM enabled for message persistence
 - **Kubernetes**: Single namespace deployment on Docker Desktop
