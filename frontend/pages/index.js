@@ -93,6 +93,23 @@ export default function Home() {
     }
   };
 
+  const handleDeleteAllSessions = async () => {
+    try {
+      const res = await fetch(`/api/sessions`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSessions([]);
+        handleNewChat();
+        return data;
+      }
+    } catch (err) {
+      console.error("Failed to delete all sessions", err);
+      throw err;
+    }
+  };
+
   const generateTitle = async (sessionId) => {
     try {
       const res = await fetch(`/api/sessions/${sessionId}/generate-title`, {
@@ -191,6 +208,7 @@ export default function Home() {
         onSessionSelect={handleSessionSelect}
         onNewChat={handleNewChat}
         onDeleteSession={handleDeleteSession}
+        onDeleteAllSessions={handleDeleteAllSessions}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         onChaosToggle={() => setChaosPanelOpen(!chaosPanelOpen)}

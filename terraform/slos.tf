@@ -160,4 +160,3 @@ resource "datadog_service_level_objective" "rabbitmq_processing_availability" {
     "managed_by:terraform"
   ]
 }
-

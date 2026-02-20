@@ -676,6 +676,27 @@ async def delete_session(session_id: str) -> dict:
     return {"deleted": session_id}
 
 
+@app.delete("/sessions")
+async def delete_all_sessions() -> dict:
+    """Delete all sessions and their messages"""
+    assert pool is not None
+    
+    def _delete_all() -> int:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                # Get count before deletion
+                cur.execute("SELECT COUNT(*) FROM sessions")
+                count = cur.fetchone()[0]
+                # Messages will be cascade deleted due to FK constraint
+                cur.execute("DELETE FROM sessions")
+            conn.commit()
+        return count
+    
+    deleted_count = await asyncio.to_thread(_delete_all)
+    logger.info(f"Deleted all {deleted_count} sessions")
+    return {"deleted_count": deleted_count, "message": f"Deleted {deleted_count} conversation(s)"}
+
+
 # ============================================================================
 # CHAOS ENGINEERING ENDPOINTS (for demo purposes)
 # ============================================================================
@@ -710,5 +731,3 @@ async def chaos_traffic(request: TrafficRequest) -> dict:
 async def chaos_scenario(request: ScenarioRequest) -> dict:
     """Trigger a break-fix scenario"""
     return await trigger_scenario(request.scenario)
-
-

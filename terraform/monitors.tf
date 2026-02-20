@@ -523,4 +523,3 @@ resource "datadog_monitor" "rabbitmq_connections" {
     "managed_by:terraform"
   ]
 }
-

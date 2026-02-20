@@ -1,6 +1,9 @@
 # Monitor Analysis Notebook
 # This notebook documents monitor threshold analysis and tuning recommendations
+# NOTE: datadog_notebook resource is not supported in current Terraform provider version
+# Create notebooks manually in UI or via API
 
+/*
 resource "datadog_notebook" "monitor_analysis" {
   name = "[${var.environment}] Monitor Threshold Analysis & Tuning"
 
@@ -443,6 +446,11 @@ EOT
     "category:monitoring"
   ]
 }
+*/
+
+
+
+
 
 
 
