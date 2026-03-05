@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+  namespace: chat-demo
+  labels:
+    app: loadgen
+    tags.datadoghq.com/service: loadgen
+    tags.datadoghq.com/env: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loadgen
+  template:
+    metadata:
+      labels:
+        app: loadgen
+        tags.datadoghq.com/service: loadgen
+        tags.datadoghq.com/env: demo
+        tags.datadoghq.com/version: "1.0.0"
+      annotations:
+        ad.datadoghq.com/loadgen.logs: '[{"source":"python","service":"loadgen"}]'
+    spec:
+      # Delay start until backend is available (init container does a health check loop)
+      initContainers:
+        - name: wait-for-backend
+          image: curlimages/curl:8.10.1
+          command:
+            - sh
+            - -c
+            - |
+              until curl -sf http://backend:8000/health; do
+                echo "Waiting for backend..."
+                sleep 5
+              done
+              echo "Backend is up."
+      containers:
+        - name: loadgen
+          image: loadgen:latest
+          imagePullPolicy: Never
+          env:
+            - name: BACKEND_URL
+              value: "http://backend:8000"
+            # Target request rate (requests per second)
+            - name: LOAD_RPS
+              value: "1.0"
+            # Number of concurrent sessions to maintain
+            - name: LOAD_SESSIONS
+              value: "3"
+            # Fraction of requests that send a malformed/empty prompt (triggers 4xx errors)
+            # Set to 0.0 to disable error injection; 0.05–0.15 creates visible error rates
+            - name: LOAD_ERROR_RATE
+              value: "0.05"
+            # Fraction of requests that send a very long prompt (creates slow spans in APM)
+            - name: LOAD_SLOW_RATE
+              value: "0.05"
+            # Request timeout in seconds (worker has up to 60s to respond)
+            - name: REQUEST_TIMEOUT
+              value: "90.0"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
