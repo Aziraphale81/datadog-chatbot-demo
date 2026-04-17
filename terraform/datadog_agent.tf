@@ -8,7 +8,7 @@ resource "helm_release" "datadog_agent" {
   repository       = "https://helm.datadoghq.com"
   chart            = "datadog"
   namespace        = var.namespace
-  create_namespace = false  # Namespace created by K8s manifests
+  create_namespace = false # Namespace created by K8s manifests
 
   values = [
     yamlencode({
@@ -18,70 +18,70 @@ resource "helm_release" "datadog_agent" {
         site                 = var.datadog_site
         clusterName          = var.cluster_name
         tags                 = ["env:${var.environment}", "team:chatbot", "application:chatbot-demo"]
-        
+
         apm = {
           enabled = true
         }
-        
+
         # Application Security Management (ASM)
         appSec = {
           enabled = true
         }
-        
+
         logs = {
-          enabled                     = true
-          containerCollectAll         = true
-          containerCollectUsingFiles  = false
+          enabled                    = true
+          containerCollectAll        = true
+          containerCollectUsingFiles = false
         }
-        
+
         processAgent = {
           enabled           = true
           processCollection = true
         }
-        
+
         networkMonitoring = {
           enabled = true
         }
-        
+
         orchestratorExplorer = {
           enabled = true
         }
-        
+
         databaseMonitoring = {
           enabled = true
         }
-        
+
         # Network Performance Monitoring (NPM) - replaces systemProbe.enabled
         networkMonitoring = {
           enabled = true
         }
-        
+
         # System Probe granular features
         systemProbe = {
           enableTCPQueueLength = true
           enableOOMKill        = true
         }
-        
+
         # Cloud Security Management (CSM)
         securityAgent = {
           compliance = {
             enabled = true
           }
           runtime = {
-            enabled = true  # This enables CWS runtime detection
+            enabled = true # This enables CWS runtime detection
           }
         }
-        
+
         # Container Image Vulnerabilities
         containerImageCollection = {
           enabled = true
         }
-        
+
         kubelet = {
           tlsVerify = false
         }
       }
-      
+
       agents = {
         useHostNetwork = true
         containers = {
@@ -96,6 +96,15 @@ resource "helm_release" "datadog_agent" {
                 value = "name:etcd"
               }
             ]
+            livenessProbe = {
+              httpGet = {
+                path = "/live"
+                port = 5555
+              }
+              initialDelaySeconds = 90
+              timeoutSeconds      = 15
+              failureThreshold    = 6
+            }
           }
           systemProbe = {
             securityContext = {
@@ -115,7 +124,7 @@ resource "helm_release" "datadog_agent" {
           }
         }
       }
-      
+
       targetSystem = "linux"
     })
   ]
