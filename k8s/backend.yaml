@@ -31,17 +31,36 @@ spec:
               {
                 "type": "exclude_at_match",
                 "name": "exclude_health_checks",
-                "pattern": "GET /health"
+                "pattern": "GET /health|GET /ready"
               }
             ]
           }]
     spec:
       serviceAccountName: chaos-controller
+      initContainers:
+        - name: wait-for-trace-agent
+          image: busybox:latest
+          env:
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          command:
+            - sh
+            - -c
+            - |
+              until wget -qO- http://$DD_AGENT_HOST:8126/info >/dev/null 2>&1; do
+                echo "waiting for Datadog trace agent..."; sleep 2
+              done
       containers:
         - name: backend
           image: chat-backend:latest
           imagePullPolicy: IfNotPresent
           env:
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
             - name: DD_SERVICE
               value: chat-backend
             - name: DD_ENV
@@ -62,9 +81,9 @@ spec:
             - name: DD_TRACE_OPENAI_ENABLED
               value: "true"
             - name: DD_TRACE_AGENT_URL
-              value: http://datadog-agent.chat-demo.svc.cluster.local:8126
+              value: "http://$(DD_AGENT_HOST):8126"
             - name: DD_DOGSTATSD_URL
-              value: udp://datadog-agent.chat-demo.svc.cluster.local:8125
+              value: "udp://$(DD_AGENT_HOST):8125"
             - name: DD_LOGS_INJECTION
               value: "true"
             - name: DD_RUNTIME_METRICS_ENABLED
@@ -83,7 +102,7 @@ spec:
               value: "true"
             # Filter out health check spans
             - name: DD_TRACE_IGNORE_RESOURCE_NAMES
-              value: "GET /health"
+              value: "GET /health,GET /ready"
             # Data Streams Monitoring - KEY CONFIG
             - name: DD_DATA_STREAMS_ENABLED
               value: "true"
@@ -120,16 +139,17 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 384Mi
+              memory: 512Mi
             limits:
               cpu: 500m
-              memory: 768Mi
+              memory: 1024Mi
           readinessProbe:
             httpGet:
-              path: /health
+              path: /ready
               port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 300  # Check every 5 minutes (demo, filtered by DD_TRACE_IGNORE_RESOURCE_NAMES)
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
 ---
 apiVersion: v1
 kind: Service

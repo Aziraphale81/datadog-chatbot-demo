@@ -24,6 +24,7 @@ ENV DD_ENV=dev \
     DD_LLMOBS_ENABLED=true \
     DD_APPSEC_ENABLED=false
 
-CMD ["ddtrace-run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run uvicorn directly (ddtrace-run prevents FastAPI startup from running; instrumentation via patch() in app.main)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 

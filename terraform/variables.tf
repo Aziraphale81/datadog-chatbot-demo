@@ -31,7 +31,7 @@ variable "environment" {
 variable "cluster_name" {
   description = "Kubernetes cluster name"
   type        = string
-  default     = "docker-desktop"
+  default     = "colima"
 }
 
 variable "namespace" {

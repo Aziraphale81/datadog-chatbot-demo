@@ -48,7 +48,13 @@ resource "datadog_monitor" "backend_error_rate" {
   message = <<-EOT
     The ${var.backend_service} has exceeded 20 errors in the last 5 minutes.
     
-    Check APM Error Tracking for details.
+    Common causes:
+    - **Startup ordering (e.g. after K8s/Docker restart)**: Backend can receive traffic before RabbitMQ publisher is connected, causing `AttributeError: 'NoneType' object has no attribute 'publish'` on POST /chat. Fix: ensure readiness probe uses /ready (checks rabbitmq_client); publisher init runs in background thread; /chat returns 503 until client is ready.
+    - General API or dependency failures.
+    
+    Check:
+    - APM Error Tracking and backend logs for tracebacks
+    - If errors are POST /chat + NoneType/publish → verify readiness probe and RabbitMQ connectivity
     
     ${var.alert_email != "" ? "@${var.alert_email}" : ""}
     ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
@@ -216,6 +222,46 @@ resource "datadog_monitor" "pod_restarts" {
   ]
 }
 
+# Chat worker must have ≥1 available replica or UI chat times out (queue never consumed)
+resource "datadog_monitor" "chat_worker_replicas" {
+  name    = "[${var.environment}] Chat worker has no available replicas"
+  type    = "metric alert"
+  message = <<-EOT
+    The **chat-worker** Deployment has **zero available replicas**. POST /chat publishes to RabbitMQ but nothing consumes the queue, so the UI shows errors or long timeouts ("Something went wrong. Check backend or OpenAI key.").
+
+    **Common cause:** Chaos scenarios *Worker crash* or *Queue backup* scale chat-worker to 0; that persists across Docker Desktop restarts.
+
+    **Fix:**
+    - `./scripts/ensure-chat-ready.sh`
+    - or `kubectl scale deployment/chat-worker -n ${var.namespace} --replicas=1`
+    - or Chaos panel → **Heal all**
+
+    ${var.alert_email != "" ? "@${var.alert_email}" : ""}
+    ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
+  EOT
+
+  query = "max(last_5m):kubernetes_state.deployment.replicas_available{kube_namespace:${var.namespace},kube_deployment:chat-worker} < 1"
+
+  monitor_thresholds {
+    critical = 1
+  }
+
+  notify_no_data    = false
+  renotify_interval = 30
+  notify_audit      = false
+  timeout_h         = 1
+  include_tags      = true
+  priority          = 1
+
+  tags = [
+    "service:chat-worker",
+    "env:${var.environment}",
+    "team:chatbot",
+    "category:kubernetes",
+    "managed_by:terraform"
+  ]
+}
+
 # SLO Burn Rate - Backend Availability
 # NOTE: Commented out to create manually in UI and export later
 # Datadog SLO burn rate query syntax may require specific configuration
@@ -268,6 +314,8 @@ resource "datadog_monitor" "rabbitmq_queue_depth" {
     - Worker service health and processing rate
     - Backend message publishing rate
     - Consumer lag in DSM dashboards
+    
+    Runbook (diagnose & fix): https://app.${var.datadog_site}/notebook/14054972
     
     ${var.alert_email != "" ? "@${var.alert_email}" : ""}
     ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}
@@ -494,6 +542,8 @@ resource "datadog_monitor" "rabbitmq_connections" {
     - Network connectivity
     - RabbitMQ management UI (port 15672)
     - DSM pathway visualization
+    
+    Runbook (diagnose & fix): https://app.${var.datadog_site}/notebook/14054970
     
     ${var.alert_email != "" ? "@${var.alert_email}" : ""}
     ${var.alert_slack_channel != "" ? var.alert_slack_channel : ""}

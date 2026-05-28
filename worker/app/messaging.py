@@ -36,6 +36,7 @@ class RabbitMQClient:
             routing_key=queue_name,
             declare=[Queue(queue_name, durable=True)],
             serializer='json',  # Let Kombu handle JSON serialization
+            delivery_mode=2,  # Persistent delivery - messages survive RabbitMQ restarts
         )
         logger.info(f"Published message to queue '{queue_name}': {message.get('request_id', 'unknown')}")
         

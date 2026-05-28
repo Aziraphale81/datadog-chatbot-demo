@@ -28,6 +28,27 @@ This script will:
 
 After setup completes, access the app at `http://localhost:30080`.
 
+### After Docker Desktop starts (chat UI errors or timeouts)
+
+If you see **“Something went wrong. Check backend or OpenAI key.”** after starting Docker Desktop, the usual cause is **`chat-worker` scaled to 0 replicas**. Chaos scenarios *Worker crash* and *Queue backup* call `kubectl scale deployment/chat-worker --replicas=0`; that desired count is **saved in the cluster** and **survives restarts**, so there is no worker to process the queue and the backend waits until it times out.
+
+**Fix (one command):**
+
+```bash
+./scripts/ensure-chat-ready.sh
+```
+
+Or restore from the manifest / chaos heal:
+
+```bash
+kubectl apply -f k8s/worker.yaml -n chat-demo   # resets replicas to 1 from YAML
+# or in the app: Chaos panel → **Heal all**
+```
+
+To avoid surprises after demos, use **Heal all** in the Chaos panel when you are done, or re-run `ensure-chat-ready.sh` before testing chat.
+
+If the **frontend** logs show `ECONNREFUSED` to the backend Service IP, the **backend pod was not Ready** (not in the Service endpoints). Typical causes after a Docker Desktop restart: **Postgres/CoreDNS not ready yet** (`Temporary failure in name resolution` in backend logs)—the backend now **retries database init** until Postgres is reachable; or **OOMKilled** (exit 137). The backend manifest uses **512Mi request / 1Gi limit** so a full startup (DB + RabbitMQ + APM) fits.
+
 ---
 
 ## Manual Setup

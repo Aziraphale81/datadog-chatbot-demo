@@ -11,46 +11,62 @@ export default async function handler(req, res) {
 
   const backendBase = process.env.BACKEND_URL || "http://backend:8000";
 
-  // Forward Datadog trace headers for distributed tracing
   const traceHeaders = {};
-  const ddHeaders = [
-    "x-datadog-trace-id",
-    "x-datadog-parent-id",
-    "x-datadog-sampling-priority",
-    "x-datadog-origin",
-  ];
-  ddHeaders.forEach((header) => {
-    if (req.headers[header]) {
-      traceHeaders[header] = req.headers[header];
-    }
-  });
+  ["x-datadog-trace-id", "x-datadog-parent-id", "x-datadog-sampling-priority", "x-datadog-origin"].forEach(
+    (h) => { if (req.headers[h]) traceHeaders[h] = req.headers[h]; }
+  );
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 50000);
 
   try {
-    // Backend now waits for worker response internally (no polling needed)
-    const resp = await fetch(`${backendBase}/chat`, {
+    const { fetchWithRetry } = await import("../../lib/backendFetch");
+    const resp = await fetchWithRetry(`${backendBase}/chat`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...traceHeaders,
-      },
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", ...traceHeaders },
       body: JSON.stringify({ prompt, session_id }),
     });
+    clearTimeout(timeoutId);
 
     if (!resp.ok) {
       const text = await resp.text();
-      return res
-        .status(502)
-        .json({ error: "Backend error", status: resp.status, body: text });
+      let detail = text;
+      try {
+        const j = JSON.parse(text);
+        detail = j.detail || j.body || j.error || text;
+      } catch (_) {}
+      return res.status(resp.status === 404 ? 404 : 502).json({ error: "Backend error", body: detail });
     }
 
-    const data = await resp.json();
-    return res.status(200).json(data);
+    // Backend is streaming SSE — pipe it through
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    const reader = resp.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(value);
+      if (typeof res.flush === "function") res.flush();
+    }
+    res.end();
   } catch (err) {
+    clearTimeout(timeoutId);
     console.error("API route /api/chat failed", err);
-    return res
-      .status(500)
-      .json({ error: "Unable to reach backend from frontend" });
+    const isTimeout = err.name === "AbortError" || err.message?.includes("aborted");
+    if (!res.headersSent) {
+      return res.status(isTimeout ? 504 : 500).json({
+        error: isTimeout ? "Request timed out" : "Unable to reach backend",
+        detail: err.message,
+      });
+    }
+    // Headers already sent (mid-stream error) — send SSE error event
+    try {
+      res.write(`data: ${JSON.stringify({ type: "error", message: isTimeout ? "Request timed out" : "Connection lost" })}\n\n`);
+      res.end();
+    } catch (_) {}
   }
 }
-
-

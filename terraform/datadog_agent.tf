@@ -86,6 +86,10 @@ resource "helm_release" "datadog_agent" {
         useHostNetwork = true
         containers = {
           agent = {
+            resources = {
+              requests = { cpu = "200m", memory = "256Mi" }
+              limits   = { cpu = "1000m", memory = "512Mi" }
+            }
             env = [
               {
                 name  = "DD_LOGS_CONFIG_PROCESSING_RULES"
@@ -120,6 +124,10 @@ resource "helm_release" "datadog_agent" {
                   "CHOWN"
                 ]
               }
+            }
+            resources = {
+              requests = { cpu = "100m", memory = "256Mi" }
+              limits   = { cpu = "500m", memory = "512Mi" }
             }
           }
         }

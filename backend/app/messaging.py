@@ -7,7 +7,6 @@ import os
 import threading
 from typing import Dict, Callable, Optional
 from kombu import Connection, Producer, Consumer, Queue, Exchange
-
 logger = logging.getLogger(__name__)
 
 class RabbitMQClient:
@@ -19,25 +18,50 @@ class RabbitMQClient:
         self.producer: Optional[Producer] = None
         
     def connect(self):
-        """Establish connection and create producer"""
-        self.connection = Connection(self.broker_url)
+        """Establish connection and create producer. Idempotent; replaces existing connection."""
+        if self.connection:
+            try:
+                self.connection.release()
+            except Exception:
+                pass
+            self.connection = None
+            self.producer = None
+        self.connection = Connection(self.broker_url, connect_timeout=10)
         self.connection.connect()
         self.producer = Producer(self.connection)
         logger.info(f"Connected to RabbitMQ via Kombu at {self.broker_url}")
         
     def publish(self, queue_name: str, message: dict):
-        """Publish message to queue (DSM auto-instrumented)"""
-        if not self.producer:
-            self.connect()
-            
-        # IMPORTANT: Pass dict directly, let Kombu serialize + inject DSM headers
-        self.producer.publish(
-            message,  # Dict, not json.dumps(message)
-            routing_key=queue_name,
-            declare=[Queue(queue_name, durable=True)],
-            serializer='json',  # Let Kombu handle JSON serialization
-        )
-        logger.info(f"Published message to queue '{queue_name}': {message.get('request_id', 'unknown')}")
+        """Publish message to queue (DSM auto-instrumented). Uses a fresh connection per publish to avoid
+        'Server unexpectedly closed connection' when RabbitMQ restarts or drops long-lived connections.
+        Retries on connection failure to handle transient refusals."""
+        import time
+        last_error = None
+        for attempt in range(3):
+            conn = Connection(self.broker_url, connect_timeout=10)
+            try:
+                conn.connect()
+                producer = Producer(conn)
+                producer.publish(
+                    message,
+                    routing_key=queue_name,
+                    declare=[Queue(queue_name, durable=True)],
+                    serializer='json',
+                    delivery_mode=2,  # persistent delivery
+                )
+                logger.info(f"Published message to queue '{queue_name}': {message.get('request_id', 'unknown')}")
+                return
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Publish attempt {attempt + 1}/3 failed: {e}")
+            finally:
+                try:
+                    conn.release()
+                except Exception:
+                    pass
+            if attempt < 2:
+                time.sleep(1)
+        raise last_error
         
     def consume(self, queue_name: str, callback: Callable[[dict], None], timeout: float = None):
         """Consume messages from queue (DSM auto-instrumented)"""

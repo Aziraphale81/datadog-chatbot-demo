@@ -9,7 +9,7 @@
     "tags": [
       "env:dev",
       "platform:kubernetes",
-      "cloud:docker-desktop",
+      "cloud:colima",
       "application:chatbot-demo",
       "demo:true"
     ],

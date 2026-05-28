@@ -130,64 +130,101 @@ export default function Home() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim() || loading) return;
-    
+
     setLoading(true);
     setError("");
-    
+
+    const submittedPrompt = prompt;
+    setPrompt("");
+
+    const isFirstMessage = messages.length === 0;
+    const placeholderId = `streaming-${Date.now()}`;
+
+    // Add placeholder immediately
+    const placeholder = {
+      id: placeholderId,
+      session_id: currentSessionId,
+      prompt: submittedPrompt,
+      reply: "",
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, placeholder]);
+
     try {
-      const res = await fetch(`/api/chat`, {
+      const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          prompt,
-          session_id: currentSessionId 
-        }),
+        body: JSON.stringify({ prompt: submittedPrompt, session_id: currentSessionId }),
       });
-      
-      if (!res.ok) {
-        throw new Error(`Request failed: ${res.status}`);
+
+      if (!resp.ok) {
+        // JSON error (before SSE started)
+        setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
+        let message = "Something went wrong.";
+        try {
+          const data = await resp.json();
+          message = data.body ?? data.detail ?? data.error ?? message;
+        } catch (_) {}
+        throw new Error(typeof message === "string" ? message : JSON.stringify(message));
       }
-      
-      const data = await res.json();
-      console.log("Received response:", data);
-      
-      // Update or set current session
-      const newSessionId = data.session_id;
-      const isFirstMessage = messages.length === 0; // Check BEFORE updating state
-      if (!currentSessionId) {
-        setCurrentSessionId(newSessionId);
+
+      // Parse SSE stream
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalSessionId = currentSessionId;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop(); // keep incomplete event
+
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data: ")) continue;
+          let event;
+          try {
+            event = JSON.parse(line.slice(6));
+          } catch (_) {
+            continue;
+          }
+
+          if (event.type === "chunk") {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === placeholderId ? { ...m, reply: m.reply + event.content } : m
+              )
+            );
+          } else if (event.type === "done") {
+            finalSessionId = event.session_id;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === placeholderId
+                  ? { ...m, id: event.message_id, session_id: event.session_id, reply: event.reply }
+                  : m
+              )
+            );
+            if (!currentSessionId) {
+              setCurrentSessionId(event.session_id);
+            }
+            await loadSessions();
+            if (isFirstMessage) {
+              setTimeout(() => generateTitle(event.session_id), 1000);
+            }
+          } else if (event.type === "error") {
+            setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
+            throw new Error(event.message || "Worker error");
+          }
+        }
       }
-      
-      // Add message to local state
-      const newMessage = {
-        id: data.message_id,
-        session_id: newSessionId,
-        prompt: prompt,
-        reply: data.reply,
-        created_at: new Date().toISOString(),
-      };
-      console.log("Adding message to state:", newMessage);
-      setMessages(prevMessages => {
-        console.log("Previous messages:", prevMessages);
-        const newState = [...prevMessages, newMessage];
-        console.log("New messages state:", newState);
-        return newState;
-      });
-      
-      // Clear prompt
-      setPrompt("");
-      
-      // Reload sessions list
-      await loadSessions();
-      
-      // Generate title if this is the first message
-      if (isFirstMessage) {
-        setTimeout(() => generateTitle(newSessionId), 1000);
-      }
-      
     } catch (err) {
       console.error("Chat error", err);
-      setError("Something went wrong. Check backend or OpenAI key.");
+      // Remove placeholder if still there
+      setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
+      setError(err.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }

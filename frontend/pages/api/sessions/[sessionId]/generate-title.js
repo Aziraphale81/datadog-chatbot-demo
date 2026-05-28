@@ -1,10 +1,12 @@
+import { fetchWithRetry } from "../../../../lib/backendFetch";
+
 export default async function handler(req, res) {
   const { sessionId } = req.query;
   const backendUrl = process.env.BACKEND_URL || "http://backend:8000";
 
   if (req.method === "POST") {
     try {
-      const response = await fetch(`${backendUrl}/sessions/${sessionId}/generate-title`, {
+      const response = await fetchWithRetry(`${backendUrl}/sessions/${sessionId}/generate-title`, {
         method: "POST",
       });
       const data = await response.json();

@@ -1,3 +1,7 @@
+# Chat worker: required for /chat (consumes RabbitMQ, calls OpenAI).
+# replicas: 1 is the intended default. Chaos demos ("Worker crash", "Queue backup") scale
+# this deployment to 0; that survives Docker Desktop restarts. If the UI times out on chat,
+# run: ./scripts/ensure-chat-ready.sh  (or: kubectl scale deployment/chat-worker -n chat-demo --replicas=1)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,7 +12,7 @@ metadata:
     tags.datadoghq.com/service: chat-worker
     tags.datadoghq.com/env: demo
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: chat-worker
@@ -24,6 +28,21 @@ spec:
       annotations:
         ad.datadoghq.com/chat-worker.logs: '[{"source":"python","service":"chat-worker"}]'
     spec:
+      initContainers:
+        - name: wait-for-trace-agent
+          image: busybox:latest
+          env:
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          command:
+            - sh
+            - -c
+            - |
+              until wget -qO- http://$DD_AGENT_HOST:8126/info >/dev/null 2>&1; do
+                echo "waiting for Datadog trace agent..."; sleep 2
+              done
       containers:
         - name: chat-worker
           image: chat-worker:latest
@@ -84,4 +103,20 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "1000m"
+          livenessProbe:
+            exec:
+              command:
+                - python3
+                - -c
+                - |
+                  import os, time, sys
+                  f = '/tmp/worker_heartbeat'
+                  if not os.path.exists(f):
+                    sys.exit(0)
+                  age = time.time() - os.path.getmtime(f)
+                  sys.exit(0 if age < 120 else 1)
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            failureThreshold: 3
+            timeoutSeconds: 5
 

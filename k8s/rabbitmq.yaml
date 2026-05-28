@@ -48,6 +48,7 @@ spec:
               "rabbitmq_api_url": "http://%%host%%:15672/api/",
               "username": "guest",
               "password": "guest",
+              "timeout": 20,
               "queues": ["chat_requests", "chat_responses"],
               "queues_regexes": ["chat_.*"],
               "collect_queue_metrics": true,
@@ -79,25 +80,23 @@ spec:
                   fieldPath: status.hostIP
           resources:
             requests:
-              memory: "256Mi"
+              memory: "384Mi"
               cpu: "100m"
             limits:
-              memory: "512Mi"
+              memory: "1Gi"
               cpu: "500m"
           livenessProbe:
-            exec:
-              command:
-                - rabbitmq-diagnostics
-                - ping
-            initialDelaySeconds: 60
-            periodSeconds: 30
-            timeoutSeconds: 10
+            tcpSocket:
+              port: 5672
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 4
           readinessProbe:
-            exec:
-              command:
-                - rabbitmq-diagnostics
-                - check_port_connectivity
-            initialDelaySeconds: 20
+            tcpSocket:
+              port: 5672
+            initialDelaySeconds: 90
             periodSeconds: 10
             timeoutSeconds: 5
+            failureThreshold: 6
 

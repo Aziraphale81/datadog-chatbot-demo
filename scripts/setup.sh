@@ -25,12 +25,12 @@ command -v terraform >/dev/null 2>&1 || { echo "terraform is required but not in
 
 # Check Kubernetes context
 CURRENT_CONTEXT=$(kubectl config current-context)
-if [ "$CURRENT_CONTEXT" != "docker-desktop" ]; then
+if [ "$CURRENT_CONTEXT" != "colima" ]; then
     echo "Current kubectl context is '$CURRENT_CONTEXT'"
-    read -p "Switch to docker-desktop context? (y/n) " -n 1 -r
+    read -p "Switch to colima context? (y/n) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        kubectl config use-context docker-desktop
+        kubectl config use-context colima
     else
         echo "Using current context: $CURRENT_CONTEXT"
     fi
@@ -213,7 +213,7 @@ datadog_api_url = "https://api.datadoghq.com"
 datadog_site    = "datadoghq.com"
 
 environment   = "demo"
-cluster_name  = "docker-desktop"
+cluster_name  = "colima"
 namespace     = "chat-demo"
 
 backend_service  = "chat-backend"

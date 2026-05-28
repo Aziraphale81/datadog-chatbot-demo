@@ -7,6 +7,7 @@ output "monitor_ids" {
     rum_js_errors         = datadog_monitor.rum_js_errors.id
     postgres_slow_queries = datadog_monitor.postgres_slow_queries.id
     pod_restarts          = datadog_monitor.pod_restarts.id
+    chat_worker_replicas  = datadog_monitor.chat_worker_replicas.id
   }
 }
 

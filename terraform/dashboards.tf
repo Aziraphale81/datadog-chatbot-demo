@@ -203,7 +203,7 @@ resource "datadog_dashboard_json" "chatbot_overview" {
                 type        = "timeseries"
                 requests = [{
                   on_right_yaxis  = false
-                  queries = [{ data_source = "metrics", name = "query1", query = "sum:trace.openai.request{service:chat-backend,env:demo}.as_count()" }]
+                  queries = [{ data_source = "metrics", name = "query1", query = "sum:trace.openai.request{service:chat-worker,env:demo}.as_count()" }]
                   response_format = "timeseries"
                   display_type    = "bars"
                 }]
@@ -218,7 +218,7 @@ resource "datadog_dashboard_json" "chatbot_overview" {
                 type        = "timeseries"
                 requests = [{
                   on_right_yaxis  = false
-                  queries = [{ data_source = "metrics", name = "query1", query = "avg:trace.openai.request{service:chat-backend,env:demo}" }]
+                  queries = [{ data_source = "metrics", name = "query1", query = "avg:trace.openai.request{service:chat-worker,env:demo}" }]
                   response_format = "timeseries"
                   display_type    = "line"
                 }]
@@ -484,12 +484,12 @@ resource "datadog_dashboard_json" "chatbot_overview" {
             {
               id = 8379443870741390
               definition = {
-                title       = "Pod Restarts"
+                title       = "Pod Restarts (rate)"
                 show_legend = true
                 type        = "timeseries"
                 requests = [{
                   on_right_yaxis  = false
-                  queries = [{ data_source = "metrics", name = "query1", query = "sum:kubernetes.containers.restarts{kube_namespace:chat-demo} by {pod_name}" }]
+                  queries = [{ data_source = "metrics", name = "query1", query = "diff(sum:kubernetes.containers.restarts{kube_namespace:chat-demo} by {pod_name}.as_count())" }]
                   response_format = "timeseries"
                   style = { palette = "warm" }
                   display_type = "bars"

@@ -172,7 +172,7 @@ kubectl exec -it -n chat-demo deployment/backend -- /bin/bash
 
 **To view findings:**
 - Go to [Security → CSM → Misconfigurations](https://app.datadoghq.com/security/csm/misconfigurations)
-- Filter by `kube_cluster_name:docker-desktop`
+- Filter by `kube_cluster_name:colima`
 
 **Expected Findings:**
 - Backend/frontend may be running without `readOnlyRootFilesystem`
