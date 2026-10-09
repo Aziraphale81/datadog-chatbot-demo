@@ -53,7 +53,8 @@ spec:
             - name: DD_SOURCE
               value: nodejs
             
-            # Datadog RUM (browser-side monitoring)
+            # Datadog RUM: these values must also be passed at image build time.
+            # NEXT_PUBLIC_* pod variables do not change the compiled browser bundle.
             - name: NEXT_PUBLIC_DD_CLIENT_TOKEN
               valueFrom:
                 secretKeyRef:

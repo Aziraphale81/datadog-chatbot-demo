@@ -67,6 +67,20 @@ spec:
               value: "1.0"
             - name: DD_TRACE_ENABLED
               value: "true"
+            # ddtrace-run enables OpenAI LLM Observability automatically.
+            - name: DD_LLMOBS_ENABLED
+              value: "true"
+            - name: DD_LLMOBS_ML_APP
+              value: chatbot
+            - name: DD_LLMOBS_AGENTLESS_ENABLED
+              value: "true"
+            - name: DD_SITE
+              value: datadoghq.com
+            - name: DD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: datadog-keys
+                  key: api-key
             # Data Streams Monitoring - KEY CONFIG
             - name: DD_DATA_STREAMS_ENABLED
               value: "true"

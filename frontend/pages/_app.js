@@ -30,7 +30,7 @@ function MyApp({ Component, pageProps }) {
       trackBfcacheViews: true,
       trackResources: true,
       trackLongTasks: true,
-      trackInteractions: true,
+      trackUserInteractions: true,
       defaultPrivacyLevel: "mask-user-input",
       allowedTracingUrls: [
         { match: (url) => url.startsWith(window.location.origin), propagatorTypes: ["datadog"] }
@@ -49,7 +49,7 @@ function MyApp({ Component, pageProps }) {
       clientToken: ddClientToken,
       site: ddSite,
       forwardErrorsToLogs: true,
-      sampleRate: 100,
+      sessionSampleRate: 100,
       service: ddService,
       env: ddEnv,
     });

@@ -22,6 +22,7 @@ ENV DD_ENV=dev \
     DD_RUNTIME_METRICS_ENABLED=true \
     DD_TRACE_ENABLED=true \
     DD_LLMOBS_ENABLED=true \
+    DD_LLMOBS_ML_APP=chatbot \
     DD_APPSEC_ENABLED=false
 
 # Run uvicorn directly (ddtrace-run prevents FastAPI startup from running; instrumentation via patch() in app.main)
