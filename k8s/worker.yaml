@@ -72,8 +72,6 @@ spec:
               value: "true"
             - name: DD_LLMOBS_ML_APP
               value: chatbot
-            - name: DD_LLMOBS_AGENTLESS_ENABLED
-              value: "true"
             - name: DD_SITE
               value: datadoghq.com
             - name: DD_API_KEY
