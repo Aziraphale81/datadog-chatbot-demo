@@ -1,11 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styles from './ChaosPanel.module.css';
+import { updateTraffic } from '../lib/traffic';
 
 export default function ChaosPanel({ isOpen, onClose }) {
   const [trafficEnabled, setTrafficEnabled] = useState(false);
   const [trafficLevel, setTrafficLevel] = useState('light');
   const [activeScenarios, setActiveScenarios] = useState([]);
   const [status, setStatus] = useState({});
+  const [trafficPending, setTrafficPending] = useState(false);
+  const [trafficError, setTrafficError] = useState('');
+  const trafficUpdating = useRef(false);
+  const trafficRevision = useRef(0);
 
   useEffect(() => {
     if (isOpen) {
@@ -16,31 +21,40 @@ export default function ChaosPanel({ isOpen, onClose }) {
   }, [isOpen]);
 
   const fetchStatus = async () => {
+    const revision = trafficRevision.current;
+    const canUpdateTraffic = !trafficUpdating.current;
     try {
       const response = await fetch('/api/chaos/status');
+      if (!response.ok) throw new Error('Unable to fetch chaos status');
       const data = await response.json();
+      if (revision !== trafficRevision.current) return;
       setStatus(data);
-      setTrafficEnabled(data.trafficEnabled || false);
+      if (canUpdateTraffic && !trafficUpdating.current) {
+        setTrafficEnabled(data.trafficEnabled || false);
+        setTrafficLevel(data.trafficLevel || 'light');
+      }
       setActiveScenarios(data.activeScenarios || []);
     } catch (error) {
       console.error('Failed to fetch chaos status:', error);
     }
   };
 
-  const toggleTraffic = async () => {
+  const applyTraffic = async (enabled, level) => {
+    if (trafficUpdating.current) return;
+    trafficUpdating.current = true;
+    trafficRevision.current += 1;
+    setTrafficPending(true);
+    setTrafficError('');
     try {
-      const response = await fetch('/api/chaos/traffic', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          enabled: !trafficEnabled,
-          level: trafficLevel 
-        })
-      });
-      const data = await response.json();
+      const data = await updateTraffic(enabled, level);
       setTrafficEnabled(data.enabled);
+      setTrafficLevel(data.level);
+      await fetchStatus();
     } catch (error) {
-      console.error('Failed to toggle traffic:', error);
+      setTrafficError(error.message || 'Unable to update traffic');
+    } finally {
+      trafficUpdating.current = false;
+      setTrafficPending(false);
     }
   };
 
@@ -116,7 +130,8 @@ export default function ChaosPanel({ isOpen, onClose }) {
                 <input 
                   type="checkbox" 
                   checked={trafficEnabled}
-                  onChange={toggleTraffic}
+                  onChange={() => applyTraffic(!trafficEnabled, trafficLevel)}
+                  disabled={trafficPending}
                 />
                 <span className={styles.slider}></span>
                 <span className={styles.label}>
@@ -124,13 +139,15 @@ export default function ChaosPanel({ isOpen, onClose }) {
                 </span>
               </label>
             </div>
+            {trafficError && <p role="alert">{trafficError}</p>}
 
             {trafficEnabled && (
               <div className={styles.trafficControls}>
                 <label>Intensity:</label>
                 <select 
                   value={trafficLevel} 
-                  onChange={(e) => setTrafficLevel(e.target.value)}
+                  onChange={(e) => applyTraffic(true, e.target.value)}
+                  disabled={trafficPending}
                   className={styles.select}
                 >
                   <option value="light">Light (5 req/min)</option>
@@ -141,6 +158,10 @@ export default function ChaosPanel({ isOpen, onClose }) {
                 {status.trafficStats && (
                   <div className={styles.stats}>
                     <div>Requests sent: {status.trafficStats.total}</div>
+                    <div>In flight: {status.trafficStats.inFlight || 0}</div>
+                    <div>Completed: {status.trafficStats.completed || 0}</div>
+                    <div>Failed: {status.trafficStats.failed || 0}</div>
+                    <div>Skipped at capacity: {status.trafficStats.skipped || 0}</div>
                     <div>Success rate: {status.trafficStats.successRate}%</div>
                   </div>
                 )}

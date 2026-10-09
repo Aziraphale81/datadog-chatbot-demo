@@ -168,6 +168,27 @@ kubectl rollout status -n chat-demo deployment/frontend --timeout=180s
 
 The reported RUM blocker was a browser adblocker. Disabling it requires no rebuild if the existing image already contains valid RUM credentials. A rebuild is required to pick up the SDK option fixes here or to change credentials, site, service, environment, or version baked into the frontend.
 
+### Chaos panel traffic generation
+
+The panel controls a background generator inside the backend pod. Changing intensity while traffic is on immediately updates the running generator: Light targets 5 request starts/minute, Medium 20, and Heavy 60. Requests run concurrently so OpenAI response time does not determine the send interval. Up to 64 requests can be in flight; additional starts are skipped at capacity and shown in the panel. Turning traffic off stops new starts while existing requests finish. Traffic state and counters reset when the backend restarts.
+
+The counters distinguish requests sent, completed, in flight, failed, and skipped at capacity. Success requires the chat stream's final `done` event; an HTTP 200 followed by a stream error is a failure. The separate deployment in `k8s/loadgen.yaml` is independent of these panel controls.
+
+To deploy changes to this generator, rebuild the backend and frontend using the manual build steps above, then restart those two deployments. Apply the dashboard Terraform change through your existing Terraform workflow, or edit **Backend Request Rate** in the Datadog UI to use:
+
+```text
+sum:trace.http.request.hits{service:chat-backend,env:demo}.as_rate()
+```
+
+`trace.http.request` measures request duration; `trace.http.request.hits` counts requests. To isolate generated chat traffic from readiness probes and panel polling, add `resource_name:post_/chat` to the metric filters. An application rebuild does not update an existing Datadog dashboard.
+
+Run the traffic regression tests from the repository root:
+
+```bash
+python -m unittest discover -s backend/tests -v
+node --test frontend/tests/traffic.test.cjs
+```
+
 ---
 
 ## What's Included

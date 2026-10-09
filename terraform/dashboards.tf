@@ -118,7 +118,7 @@ resource "datadog_dashboard_json" "chatbot_overview" {
                 type        = "timeseries"
                 requests = [{
                   on_right_yaxis  = false
-                  queries = [{ data_source = "metrics", name = "query1", query = "sum:trace.http.request{service:chat-backend,env:demo}.as_rate()" }]
+                  queries = [{ data_source = "metrics", name = "query1", query = "sum:trace.http.request.hits{service:chat-backend,env:demo}.as_rate()" }]
                   response_format = "timeseries"
                   display_type    = "line"
                 }]
