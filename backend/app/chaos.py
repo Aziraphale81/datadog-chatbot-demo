@@ -5,10 +5,9 @@ Provides endpoints for demo purposes to simulate load and inject failures
 
 import asyncio
 import logging
-import random
 import time
 from typing import Dict, List, Optional
-from threading import Thread
+from .traffic import TrafficGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -31,102 +30,8 @@ NAMESPACE = "chat-demo"
 
 # Global state for chaos control
 chaos_state = {
-    "trafficEnabled": False,
-    "trafficLevel": "light",
     "activeScenarios": [],
-    "trafficStats": {
-        "total": 0,
-        "successRate": 100.0
-    },
-    "traffic_thread": None
 }
-
-class TrafficGenerator:
-    """Background traffic generator"""
-    
-    def __init__(self):
-        self.running = False
-        self.total_requests = 0
-        self.successful_requests = 0
-        
-    def start(self, level: str = "light"):
-        """Start generating traffic"""
-        if self.running:
-            return
-            
-        self.running = True
-        self.level = level
-        
-        # Determine request frequency based on level
-        intervals = {
-            "light": (10, 20),   # 3-6 req/min
-            "medium": (3, 5),    # 12-20 req/min  
-            "heavy": (1, 2)      # 30-60 req/min
-        }
-        self.min_interval, self.max_interval = intervals.get(level, (10, 20))
-        
-        thread = Thread(target=self._generate_traffic, daemon=True)
-        thread.start()
-        chaos_state["traffic_thread"] = thread
-        logger.info(f"Traffic generator started at level: {level}")
-        
-    def stop(self):
-        """Stop generating traffic"""
-        self.running = False
-        logger.info("Traffic generator stopped")
-        
-    def _generate_traffic(self):
-        """Background loop to generate chat requests"""
-        import requests
-        
-        prompts = [
-            "What is Kubernetes?",
-            "Explain distributed tracing",
-            "How does APM work?",
-            "What is observability?",
-            "Tell me about microservices",
-            "How do load balancers work?",
-            "What is Docker?",
-            "Explain CI/CD pipelines",
-            "What is infrastructure as code?",
-            "How does service mesh work?"
-        ]
-        
-        while self.running:
-            try:
-                interval = random.uniform(self.min_interval, self.max_interval)
-                time.sleep(interval)
-                
-                # Send chat request to backend (same pod, localhost)
-                response = requests.post(
-                    "http://localhost:8000/chat",
-                    json={"prompt": random.choice(prompts)},
-                    timeout=45  # Increased timeout to prevent premature failures
-                )
-                
-                self.total_requests += 1
-                if response.status_code == 200:
-                    self.successful_requests += 1
-                
-                # Update stats
-                if self.total_requests > 0:
-                    chaos_state["trafficStats"]["total"] = self.total_requests
-                    chaos_state["trafficStats"]["successRate"] = round(
-                        (self.successful_requests / self.total_requests) * 100, 1
-                    )
-                    
-                logger.debug(f"Traffic request sent: {response.status_code}")
-                
-            except requests.exceptions.Timeout:
-                # Don't count timeouts during startup/restart
-                logger.warning(f"Traffic request timed out (backend may be restarting)")
-                self.total_requests += 1
-            except requests.exceptions.ConnectionError:
-                # Backend not available - likely restarting, don't count
-                logger.warning(f"Traffic request failed: backend unavailable")
-            except Exception as e:
-                logger.error(f"Traffic generation error: {e}")
-                self.total_requests += 1
 
 # Global traffic generator instance
 traffic_generator = TrafficGenerator()
@@ -418,15 +323,12 @@ def toggle_traffic(enabled: bool, level: str = "light") -> Dict:
     
     if enabled:
         traffic_generator.start(level)
-        chaos_state["trafficEnabled"] = True
-        chaos_state["trafficLevel"] = level
     else:
         traffic_generator.stop()
-        chaos_state["trafficEnabled"] = False
-    
+    state = traffic_generator.status()
     return {
-        "enabled": chaos_state["trafficEnabled"],
-        "level": chaos_state["trafficLevel"]
+        "enabled": state["enabled"],
+        "level": state["level"]
     }
 
 
@@ -434,10 +336,14 @@ async def get_chaos_status() -> Dict:
     """Get current chaos control panel status"""
     
     system_status = await get_system_status()
+    traffic = traffic_generator.status()
     
     return {
         **chaos_state,
         **system_status,
+        "trafficEnabled": traffic["enabled"],
+        "trafficLevel": traffic["level"],
+        "trafficStats": traffic["stats"],
         "traffic_thread": None,  # Don't serialize thread object
         "k8s_available": K8S_AVAILABLE
     }

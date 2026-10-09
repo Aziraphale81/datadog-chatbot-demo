@@ -7,7 +7,7 @@ import threading
 import time
 import uuid
 from collections import deque
-from typing import Optional
+from typing import Literal, Optional
 
 from ddtrace import config, patch, tracer
 from ddtrace.llmobs import LLMObs
@@ -819,12 +819,19 @@ async def delete_all_sessions() -> dict:
 from .chaos import (
     get_chaos_status,
     toggle_traffic,
+    traffic_generator,
     trigger_scenario
 )
 
+
+@app.on_event("shutdown")
+def stop_demo_traffic() -> None:
+    traffic_generator.close()
+
+
 class TrafficRequest(BaseModel):
     enabled: bool
-    level: str = "light"
+    level: Literal["light", "medium", "heavy"] = "light"
 
 class ScenarioRequest(BaseModel):
     scenario: str
