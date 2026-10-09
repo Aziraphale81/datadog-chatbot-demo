@@ -19,7 +19,7 @@ chmod +x scripts/setup.sh scripts/teardown.sh
 ```
 
 This script will:
-1. Build Docker images for backend, frontend, and worker (frontend build optionally uploads RUM source maps when `api-key` is in `datadog-keys`—no secrets stored in images)
+1. Build Docker images for backend, frontend, and worker (frontend builds require RUM credentials and optionally upload source maps using the `api-key` BuildKit secret)
 2. Create Kubernetes namespace
 3. Prompt for secrets if not already created
 4. Deploy application stack (Postgres, RabbitMQ, backend, worker, frontend)
@@ -73,8 +73,9 @@ kubectl create secret generic openai-key -n chat-demo \
 ### 2) Build Docker images
 
 ```bash
-docker build -t chat-backend:latest ./backend
-docker build -t chat-worker:latest ./worker
+VERSION=$(git rev-parse --short=7 HEAD 2>/dev/null || echo "1.0.0")
+docker build -t chat-backend:latest --build-arg "VERSION=$VERSION" ./backend
+docker build -t chat-worker:latest --build-arg "VERSION=$VERSION" ./worker
 
 # Frontend needs RUM credentials at build time
 export DD_RUM_CLIENT_TOKEN=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.rum-client-token}' | base64 -d)
@@ -82,13 +83,12 @@ export DD_RUM_APP_ID=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath=
 
 # Optional: upload RUM source maps so Error Tracking shows unminified stack traces (uses BuildKit secret; API key never stored in image)
 export DD_API_KEY=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.api-key}' | base64 -d)
-VERSION=$(git rev-parse --short=7 HEAD 2>/dev/null || echo "1.0.0")
 SOURCEMAP_SECRET_OPT=""
 [ -n "$DD_API_KEY" ] && SOURCEMAP_SECRET_OPT="--secret id=DD_API_KEY,env=DD_API_KEY"
 
 DOCKER_BUILDKIT=1 docker build -t chat-frontend:latest \
-  --build-arg NEXT_PUBLIC_DD_CLIENT_TOKEN=$DD_RUM_CLIENT_TOKEN \
-  --build-arg NEXT_PUBLIC_DD_APP_ID=$DD_RUM_APP_ID \
+  --build-arg "NEXT_PUBLIC_DD_CLIENT_TOKEN=$DD_RUM_CLIENT_TOKEN" \
+  --build-arg "NEXT_PUBLIC_DD_APP_ID=$DD_RUM_APP_ID" \
   --build-arg NEXT_PUBLIC_DD_SITE=datadoghq.com \
   --build-arg NEXT_PUBLIC_DD_SERVICE=chat-frontend \
   --build-arg NEXT_PUBLIC_DD_ENV=demo \
@@ -107,6 +107,8 @@ kubectl apply -f k8s/backend.yaml
 kubectl apply -f k8s/worker.yaml
 kubectl apply -f k8s/frontend.yaml
 ```
+
+The frontend production build aborts if either RUM value is missing or blank. `NEXT_PUBLIC_*` values are embedded in the browser bundle: setting them only on a running pod cannot enable RUM. Use `npm run dev` for local development without RUM credentials.
 
 ### 4) Deploy Datadog resources via Terraform
 
@@ -141,6 +143,30 @@ open http://localhost:30080
 # View your dashboard
 terraform -chdir=terraform output -raw dashboard_url
 ```
+
+### Rebuild and redeploy the observability fixes
+
+Both `chat-backend` and `chat-worker` send OpenAI LLM Observability spans under `ml_app=chatbot`. The worker enables the integration through `ddtrace-run`; the backend enables it explicitly before creating its OpenAI client. LLM spans use direct (agentless) export with `api-key` from `chat-demo/datadog-keys` and `DD_SITE=datadoghq.com`; the pods need access to the Datadog LLM intake. APM continues to use the Datadog Agent. The worker also requests OpenAI's final streaming usage chunk for token counts.
+
+For an existing installation:
+
+1. Check that `datadog-keys` contains a valid `api-key`, `rum-client-token`, and `rum-app-id` for the configured Datadog site. `scripts/setup.sh` now stops before building the frontend if it cannot read the RUM values or either is empty.
+2. Rebuild the backend, worker, and frontend images using **Manual Setup → Build Docker images** above. Use the Docker daemon shared with the local Kubernetes cluster; for another cluster, load the images and adjust the image references/pull policies. The worker manifest uses `imagePullPolicy: Never`.
+3. Apply the updated manifests and restart all three deployments. Reusing `:latest` does not itself restart existing pods:
+
+```bash
+for component in backend worker frontend; do
+  sed "s|\"1.0.0\"|\"$VERSION\"|g" "k8s/$component.yaml" | kubectl apply -f -
+done
+kubectl rollout restart -n chat-demo deployment/backend deployment/chat-worker deployment/frontend
+kubectl rollout status -n chat-demo deployment/backend --timeout=180s
+kubectl rollout status -n chat-demo deployment/chat-worker --timeout=180s
+kubectl rollout status -n chat-demo deployment/frontend --timeout=180s
+```
+
+4. Reload `http://localhost:30080` with the adblocker disabled for localhost. Send chat messages and trigger session title generation to exercise both OpenAI callers. Check LLM Observability for `@ml_app:chatbot` spans from both services, and RUM for `service:chat-frontend env:demo` views, resources, and actions. Browsing alone does not exercise the worker. Allow time for ingestion before checking dashboards.
+
+The reported RUM blocker was a browser adblocker. Disabling it requires no rebuild if the existing image already contains valid RUM credentials. A rebuild is required to pick up the SDK option fixes here or to change credentials, site, service, environment, or version baked into the frontend.
 
 ---
 

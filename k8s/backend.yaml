@@ -76,8 +76,10 @@ spec:
                 secretKeyRef:
                   name: datadog-keys
                   key: api-key
-            - name: DD_LLMOBS_APP_NAME
-              value: chat-backend
+            - name: DD_LLMOBS_ML_APP
+              value: chatbot
+            - name: DD_LLMOBS_AGENTLESS_ENABLED
+              value: "true"
             - name: DD_TRACE_OPENAI_ENABLED
               value: "true"
             - name: DD_TRACE_AGENT_URL

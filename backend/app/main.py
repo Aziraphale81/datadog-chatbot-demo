@@ -10,6 +10,7 @@ from collections import deque
 from typing import Optional
 
 from ddtrace import config, patch, tracer
+from ddtrace.llmobs import LLMObs
 # DSM checkpoints: Automatic via DD_DATA_STREAMS_ENABLED
 # from ddtrace.data_streams import set_checkpoint
 from dotenv import load_dotenv
@@ -22,10 +23,12 @@ from psycopg import Connection
 from psycopg_pool import ConnectionPool
 from datetime import datetime
 from typing import List, Dict
-# Enable common integrations (kombu auto-patched for DSM)
-patch(fastapi=True, psycopg=True, logging=True, kombu=True)
-
 load_dotenv()
+
+# Uvicorn runs without ddtrace-run, so enable instrumentation explicitly.
+patch(fastapi=True, psycopg=True, logging=True, kombu=True, openai=True)
+if os.getenv("DD_LLMOBS_ENABLED", "false").lower() in ("true", "1"):
+    LLMObs.enable()
 
 from pythonjsonlogger import jsonlogger
 

@@ -138,6 +138,7 @@ def call_openai_streaming(prompt: str, conversation_history: list = None):
         "model": OPENAI_MODEL,
         "messages": messages,
         "stream": True,
+        "stream_options": {"include_usage": True},
     }
     if "gpt-5" not in OPENAI_MODEL.lower():
         create_params["temperature"] = 0.7
@@ -148,15 +149,20 @@ def call_openai_streaming(prompt: str, conversation_history: list = None):
         span.set_tag("openai.prompt_length", len(prompt))
         try:
             stream = openai_client.chat.completions.create(**create_params)
-            full_text = []
+            usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
             for chunk in stream:
+                # OpenAI sends usage in a final chunk with no choices.
+                if chunk.usage is not None:
+                    usage = {
+                        "prompt_tokens": chunk.usage.prompt_tokens,
+                        "completion_tokens": chunk.usage.completion_tokens,
+                        "total_tokens": chunk.usage.total_tokens,
+                    }
                 delta = chunk.choices[0].delta.content if chunk.choices and chunk.choices[0].delta else None
                 if delta:
-                    full_text.append(delta)
                     yield delta, False, None  # chunk text, not done, no usage yet
             # stream exhausted - record success
             openai_circuit_breaker.record_success()
-            usage = {"prompt_tokens": 0, "completion_tokens": len(full_text), "total_tokens": len(full_text)}
             yield None, True, usage  # no new text, done=True, usage dict
         except Exception as e:
             openai_circuit_breaker.record_failure()
