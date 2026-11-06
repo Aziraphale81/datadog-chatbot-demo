@@ -64,7 +64,8 @@ kubectl create secret generic datadog-keys -n chat-demo \
   --from-literal=api-key='<DD_API_KEY>' \
   --from-literal=app-key='<DD_APP_KEY>' \
   --from-literal=rum-client-token='<DD_RUM_CLIENT_TOKEN>' \
-  --from-literal=rum-app-id='<DD_RUM_APP_ID>'
+  --from-literal=rum-app-id='<DD_RUM_APP_ID>' \
+  --from-literal=rum-remote-config-id='<OPTIONAL_RUM_REMOTE_CONFIG_ID>'
 
 kubectl create secret generic openai-key -n chat-demo \
   --from-literal=openai-api-key='<OPENAI_API_KEY>'

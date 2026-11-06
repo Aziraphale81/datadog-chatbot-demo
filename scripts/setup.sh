@@ -132,6 +132,8 @@ if ! DD_RUM_CLIENT_TOKEN=$(kubectl get secret datadog-keys -n chat-demo -o jsonp
     exit 1
 fi
 DD_API_KEY_FOR_BUILD=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.api-key}' 2>/dev/null | base64 -d || echo "")
+# Optional: RUM remote configuration ID (Browser SDK >= 7.13)
+DD_RUM_REMOTE_CONFIG_ID=$(kubectl get secret datadog-keys -n chat-demo -o jsonpath='{.data.rum-remote-config-id}' 2>/dev/null | base64 -d || echo "")
 
 if [ -z "$DD_RUM_CLIENT_TOKEN" ] || [ -z "$DD_RUM_APP_ID" ]; then
     echo "❌ Missing rum-client-token or rum-app-id in chat-demo/datadog-keys. Frontend build aborted." >&2
@@ -151,6 +153,7 @@ SOURCEMAP_SECRET_OPT=()
 DOCKER_BUILDKIT=1 docker build -t chat-frontend:latest \
   --build-arg "NEXT_PUBLIC_DD_CLIENT_TOKEN=$DD_RUM_CLIENT_TOKEN" \
   --build-arg "NEXT_PUBLIC_DD_APP_ID=$DD_RUM_APP_ID" \
+  --build-arg "NEXT_PUBLIC_DD_RUM_REMOTE_CONFIG_ID=$DD_RUM_REMOTE_CONFIG_ID" \
   --build-arg NEXT_PUBLIC_DD_SITE=datadoghq.com \
   --build-arg NEXT_PUBLIC_DD_SERVICE=chat-frontend \
   --build-arg NEXT_PUBLIC_DD_ENV=demo \

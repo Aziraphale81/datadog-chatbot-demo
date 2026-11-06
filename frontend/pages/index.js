@@ -2,6 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import Sidebar from "../components/Sidebar";
 import ChaosPanel from "../components/ChaosPanel";
+import { datadogRum } from "@datadog/browser-rum";
+import { FLAGS, useBooleanFlag, useVisitor } from "../lib/flags";
+
+// Shown on the welcome screen when chat_suggested_prompts is on.
+const SUGGESTED_PROMPTS = [
+  "Explain what an SLO is in two sentences",
+  "Write a haiku about on-call",
+  "Give me three tips for writing good log messages",
+];
 
 export default function Home() {
   // Session management
@@ -18,6 +27,10 @@ export default function Home() {
   
   // Auto-scroll
   const messagesEndRef = useRef(null);
+
+  // Feature flag + experiment subject
+  const suggestedPrompts = useBooleanFlag(FLAGS.suggestedPrompts, false);
+  const visitorId = useVisitor();
 
   // Load sessions on mount
   useEffect(() => {
@@ -127,17 +140,23 @@ export default function Home() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!prompt.trim() || loading) return;
+  const handleSubmit = async (e, overridePrompt, source = "typed") => {
+    e?.preventDefault();
+    const submittedPrompt = overridePrompt ?? prompt;
+    if (!submittedPrompt.trim() || loading) return;
 
     setLoading(true);
     setError("");
-
-    const submittedPrompt = prompt;
     setPrompt("");
 
     const isFirstMessage = messages.length === 0;
+
+    // Experiment metric: one RUM action per message sent.
+    datadogRum.addAction("chat_message_sent", {
+      source,
+      is_first_message: isFirstMessage,
+      suggested_prompts_enabled: suggestedPrompts.value,
+    });
     const placeholderId = `streaming-${Date.now()}`;
 
     // Add placeholder immediately
@@ -276,6 +295,22 @@ export default function Home() {
               <h1>AI Chatbot</h1>
               <p>FastAPI + Next.js + Datadog</p>
               <p className="subtitle">Start a conversation below</p>
+              {suggestedPrompts.value && (
+                <div className="suggestions">
+                  {SUGGESTED_PROMPTS.map((text) => (
+                    <button
+                      key={text}
+                      type="button"
+                      className="suggestion-chip"
+                      data-dd-action-name="suggested prompt"
+                      disabled={loading}
+                      onClick={() => handleSubmit(null, text, "suggestion")}
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div className="messages">
@@ -294,6 +329,12 @@ export default function Home() {
                 </div>
               ))}
               <div ref={messagesEndRef} />
+            </div>
+          )}
+
+          {visitorId && (
+            <div className="flag-badge" title="Feature flag evaluation for this visitor">
+              {visitorId} · {FLAGS.suggestedPrompts}: {String(suggestedPrompts.value)}
             </div>
           )}
 
