@@ -344,3 +344,45 @@ body {
 }
 
 
+
+/* Feature flag demo: suggested prompts (chat_suggested_prompts) */
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  max-width: 640px;
+}
+
+.suggestion-chip {
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  border: 1px solid #764ba2;
+  background: transparent;
+  color: #ddd;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.suggestion-chip:hover:not(:disabled) {
+  background: rgba(118, 75, 162, 0.25);
+}
+
+.suggestion-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Presenter aid: which visitor and variant is this tab? */
+.flag-badge {
+  align-self: center;
+  margin: 0.25rem 0;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #888;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+}
